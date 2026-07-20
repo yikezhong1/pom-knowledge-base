@@ -81,6 +81,7 @@ body {
   background: rgba(255,255,255,.06); color: rgba(255,255,255,.35); text-transform: uppercase;
 }
 .file-item .ext-badge.pdf { background: rgba(239,68,68,.2); color: #f87171; }
+.file-item .ext-badge.link { background: rgba(34,197,94,.15); color: #4ade80; }
 .sub-group { margin-left: 12px; }
 .sub-header { display: flex; align-items: center; padding: 6px 16px 6px 30px; color: var(--text-sidebar); font-size: 13px; font-weight: 500; cursor: pointer; user-select: none; transition: background .15s; }
 .sub-header:hover { background: var(--bg-sidebar-hover); }
@@ -99,14 +100,6 @@ body {
 .group-files.open { display: block; }
 .file-item.sub-file { padding-left: 56px; }
 .file-item.group-file { padding-left: 68px; }
-.sidebar-footer {
-  padding: 10px 14px; border-top: 1px solid rgba(255,255,255,.08); display: flex; gap: 8px;
-}
-.sidebar-footer button {
-  flex: 1; padding: 7px 0; border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
-  background: rgba(255,255,255,.05); color: var(--text-sidebar); font-size: 12px; cursor: pointer; transition: all .15s;
-}
-.sidebar-footer button:hover { background: rgba(255,255,255,.1); color: #fff; }
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .topbar {
   display: flex; align-items: center; padding: 12px 28px;
@@ -128,15 +121,30 @@ body {
 .welcome .stat-item { text-align: center; }
 .welcome .stat-num { font-size: 32px; font-weight: 700; color: var(--accent); }
 .welcome .stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-/* 首页搜索框 */
-.home-search { max-width: 520px; margin: 28px auto 0; position: relative; }
-.home-search input {
-  width: 100%; padding: 12px 18px 12px 42px; border-radius: 10px;
+/* 首页搜索 */
+.home-search { max-width: 520px; margin: 28px auto 0; }
+.search-tabs { display: flex; justify-content: center; margin-bottom: 10px; }
+.search-tab {
+  padding: 5px 20px; border: 1px solid var(--border); background: var(--bg-card);
+  font-size: 13px; cursor: pointer; transition: all .15s; color: var(--text-secondary);
+}
+.search-tab:first-child { border-radius: 6px 0 0 6px; }
+.search-tab:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.search-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.home-search-row { position: relative; display: flex; gap: 8px; }
+.home-search-row input {
+  flex: 1; padding: 12px 18px 12px 42px; border-radius: 10px;
   border: 2px solid var(--border); background: var(--bg-card); font-size: 15px;
   outline: none; transition: all .2s; color: var(--text-primary);
 }
-.home-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
-.home-search .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-secondary); pointer-events: none; }
+.home-search-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.home-search-row .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-secondary); pointer-events: none; }
+.web-search-btn {
+  padding: 10px 22px; background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  font-size: 14px; cursor: pointer; transition: background .15s; white-space: nowrap; display: none;
+}
+.web-search-btn:hover { background: #1d4ed8; }
+.web-search-btn.show { display: block; }
 .search-results { max-width: 760px; margin: 20px auto 0; text-align: left; }
 .search-results .sr-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
 .sr-item {
@@ -160,19 +168,6 @@ body {
 .welcome .cat-card .cat-name { font-size: 13px; font-weight: 600; margin-top: 8px; }
 .welcome .cat-card .cat-count { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 .welcome .cat-card .card-lock { position: absolute; top: 8px; right: 8px; font-size: 12px; opacity: .5; }
-/* 学习工具 */
-.tools-section { max-width: 760px; margin: 32px auto 0; text-align: center; }
-.tools-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--text-primary); }
-.tools-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.tool-card {
-  display: flex; align-items: center; gap: 14px; padding: 18px 20px;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  cursor: pointer; transition: all .2s; text-align: left; text-decoration: none; color: inherit;
-}
-.tool-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(37,99,235,.08); }
-.tool-card .tool-icon { font-size: 32px; }
-.tool-card .tool-name { font-size: 14px; font-weight: 700; }
-.tool-card .tool-desc { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
 /* 分类专属页面 */
 .category-page { max-width: 860px; margin: 0 auto; }
 .category-page .cp-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--border); }
@@ -184,13 +179,14 @@ body {
 .cp-file-card {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  cursor: pointer; transition: all .15s;
+  cursor: pointer; transition: all .15s; text-decoration: none; color: inherit;
 }
 .cp-file-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(37,99,235,.06); }
 .cp-file-card .cp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .cp-file-card .cp-name { font-size: 13px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-file-card .cp-ext { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--accent-light); color: var(--accent); text-transform: uppercase; font-weight: 600; }
 .cp-file-card .cp-ext.pdf { background: rgba(239,68,68,.1); color: #ef4444; }
+.cp-file-card .cp-ext.link { background: rgba(34,197,94,.1); color: #16a34a; }
 /* 密码弹窗 */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
@@ -259,7 +255,6 @@ body {
   .sidebar { width: 260px; min-width: 260px; }
   .content-wrap { padding: 16px; }
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
-  .tools-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -273,10 +268,6 @@ body {
     <input type="text" id="searchInput" placeholder="搜索文件..." oninput="onSearch(this.value)">
   </div>
   <div class="file-list" id="fileList"></div>
-  <div class="sidebar-footer">
-    <button onclick="refreshData()">刷新数据</button>
-    <button onclick="window.open('https://yikezhong1.github.io/pom-training/','_blank')">学习工具</button>
-  </div>
 </div>
 <div class="main">
   <div class="topbar">
@@ -288,7 +279,6 @@ body {
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<!-- 密码弹窗 -->
 <div class="pw-overlay" id="pwOverlay">
   <div class="pw-dialog">
     <div class="pw-icon">🔐</div>
@@ -303,20 +293,61 @@ body {
   </div>
 </div>
 <script>
-let kbData = null;
-let currentFile = null;
-let openCats = new Set();
-let openSubs = new Set();
-let openGroups = new Set();
+var kbData = null;
+var currentFile = null;
+var openCats = new Set();
+var openSubs = new Set();
+var openGroups = new Set();
+var searchMode = 'local';
+
+/* ===== 学习工具（虚拟分类） ===== */
+var LEARNING_TOOLS = [
+  { name: '知识闯关（400题）', url: 'https://yikezhong1.github.io/pom-training/quiz.html', icon: '🧠', desc: '400 道精选题目，测试你的 POM 知识水平' },
+  { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' }
+];
+var TOOLS_CAT_KEY = '学习工具';
+
+function renderToolsCatGroup() {
+  var isOpen = openCats.has(TOOLS_CAT_KEY);
+  var h = '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="toggleCat(this)"><span class="icon">📚</span><span>' + TOOLS_CAT_KEY + '</span><span class="count">' + LEARNING_TOOLS.length + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
+  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
+    var t = LEARNING_TOOLS[i];
+    h += '<div class="file-item" onclick="window.open(\'' + t.url + '\',\'_blank\')"><span class="dot"></span><span>' + t.name + '</span><span class="ext-badge link">↗</span></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function showToolsPage() {
+  currentFile = null;
+  openCats.add(TOOLS_CAT_KEY);
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '📚 <span>学习工具</span>';
+  document.getElementById('topbarActions').innerHTML = '';
+  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📚</div><div><div class="cp-title">学习工具</div><div class="cp-count">POM 培训与学习</div></div></div><div class="cp-file-grid">';
+  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
+    var t = LEARNING_TOOLS[i];
+    html += '<a class="cp-file-card" href="' + t.url + '" target="_blank"><span class="cp-dot"></span><span class="cp-name">' + t.icon + ' ' + t.name + '</span><span class="cp-ext link">↗</span></a>';
+  }
+  html += '</div><div style="margin-top:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8">';
+  for (var j = 0; j < LEARNING_TOOLS.length; j++) {
+    html += '<p>' + LEARNING_TOOLS[j].icon + ' <b>' + LEARNING_TOOLS[j].name + '</b> — ' + LEARNING_TOOLS[j].desc + '</p>';
+  }
+  html += '</div></div>';
+  document.getElementById('contentWrap').innerHTML = html;
+}
 
 /* ===== 密码保护 ===== */
-const PW_HASH = 'cG9tMjAyNg==';  // 密码
-const PROTECTED_CATS = ['03-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
-let unlocked = false;
-let pwCallback = null;
+var PW_HASH = 'cG9tMjAyNg==';
+var PROTECTED_CATS = ['03-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
+var unlocked = false;
+var pwCallback = null;
 
 function isProtected(catKey) {
-  return PROTECTED_CATS.some(function(p) { return catKey.indexOf(p) === 0; });
+  for (var i = 0; i < PROTECTED_CATS.length; i++) {
+    if (catKey.indexOf(PROTECTED_CATS[i]) === 0) return true;
+  }
+  return false;
 }
 
 function requireUnlock(catKey, callback) {
@@ -353,7 +384,7 @@ function closePwModal() {
 /* ===== 初始化 ===== */
 async function init() {
   try {
-    const res = await fetch('data.json');
+    var res = await fetch('data.json');
     kbData = await res.json();
     renderSidebar();
     showWelcome();
@@ -364,14 +395,14 @@ async function init() {
 
 async function refreshData() {
   try {
-    const res = await fetch('data.json?t=' + Date.now());
+    var res = await fetch('data.json?t=' + Date.now());
     kbData = await res.json();
     renderSidebar();
     showToast('数据已刷新 (' + new Date(kbData.buildTime).toLocaleString('zh-CN') + ')');
   } catch (e) { showToast('刷新失败'); }
 }
 
-/* ===== 返回首页（收起所有目录 + 刷新数据） ===== */
+/* ===== 返回首页 ===== */
 function goHome() {
   openCats.clear();
   openSubs.clear();
@@ -381,7 +412,7 @@ function goHome() {
   showWelcome();
 }
 
-/* ===== 侧边栏渲染 ===== */
+/* ===== 侧边栏 ===== */
 function saveOpenState() {
   document.querySelectorAll('.cat-header.open').forEach(function(h) {
     var label = h.querySelector('span:nth-child(2)');
@@ -404,8 +435,11 @@ function renderSidebar(filter) {
   if (!kbData || !kbData.categories) { el.innerHTML = '<div class="loading">无数据</div>'; return; }
   var filterLower = filter.toLowerCase();
   var html = '';
+  var toolsInjected = false;
   for (var catKey in kbData.categories) {
     var cat = kbData.categories[catKey];
+    /* 搜索时跳过未解锁的加密分类 */
+    if (filterLower && isProtected(catKey) && !unlocked) continue;
     var files = cat.files || [];
     var subfolders = cat.subfolders || [];
     if (filterLower) {
@@ -458,7 +492,13 @@ function renderSidebar(filter) {
       html += '</div></div>';
     }
     html += '</div></div>';
+    /* 在 02-产品知识 后面插入学习工具分类 */
+    if (!toolsInjected && catKey.indexOf('02-') === 0) {
+      html += renderToolsCatGroup();
+      toolsInjected = true;
+    }
   }
+  if (!toolsInjected) html += renderToolsCatGroup();
   el.innerHTML = html;
 }
 
@@ -508,7 +548,7 @@ function toggleGroup(el) {
 
 function onSearch(val) { renderSidebar(val.trim()); }
 
-/* ===== 文件查找与打开 ===== */
+/* ===== 文件打开 ===== */
 function findFileInCat(cat, filename, subfolder) {
   if (!subfolder) {
     var f = (cat.files || []).find(function(f) { return f.filename === filename; });
@@ -587,6 +627,7 @@ function showWelcome() {
     });
   });
   var catsHtml = '';
+  var toolsCardInjected = false;
   for (var i = 0; i < cats.length; i++) {
     var key = cats[i][0], cat = cats[i][1];
     var catTotal = (cat.files || []).length;
@@ -596,35 +637,71 @@ function showWelcome() {
     });
     var lockIcon = isProtected(key) && !unlocked ? '<div class="card-lock">🔒</div>' : '';
     catsHtml += '<div class="cat-card" onclick="onCatCardClick(\'' + key + '\')">' + lockIcon + '<div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
+    /* 在 02-产品知识 后面插入学习工具卡片 */
+    if (!toolsCardInjected && key.indexOf('02-') === 0) {
+      catsHtml += '<div class="cat-card" onclick="showToolsPage()"><div class="cat-icon">📚</div><div class="cat-name">学习工具</div><div class="cat-count">' + LEARNING_TOOLS.length + ' 个工具</div></div>';
+      toolsCardInjected = true;
+    }
+  }
+  if (!toolsCardInjected) {
+    catsHtml += '<div class="cat-card" onclick="showToolsPage()"><div class="cat-icon">📚</div><div class="cat-name">学习工具</div><div class="cat-count">' + LEARNING_TOOLS.length + ' 个工具</div></div>';
   }
   document.getElementById('breadcrumb').innerHTML = '知识库首页';
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="welcome">'
     + '<h2>POM 聚甲醛知识库</h2>'
     + '<p>涵盖基础知识、产品知识、换料案例、销售话术、行情资讯等全方位业务资料</p>'
-    + '<div class="home-search"><span class="search-icon">🔍</span><input type="text" id="homeSearchInput" placeholder="搜索知识库内容..." oninput="onHomeSearch(this.value)"></div>'
+    + '<div class="home-search">'
+    + '<div class="search-tabs"><button class="search-tab active" onclick="switchSearchTab(\'local\',this)">站内</button><button class="search-tab" onclick="switchSearchTab(\'web\',this)">站外</button></div>'
+    + '<div class="home-search-row"><span class="search-icon">🔍</span><input type="text" id="homeSearchInput" placeholder="搜索知识库内容..." oninput="onHomeSearch(this.value)" onkeydown="if(event.key===\'Enter\'&&searchMode===\'web\')doWebSearch(this.value)"><button class="web-search-btn" id="webSearchBtn" onclick="doWebSearch(document.getElementById(\'homeSearchInput\').value)">搜索</button></div>'
+    + '</div>'
     + '<div id="homeSearchResults"></div>'
     + '<div class="stats"><div class="stat-item"><div class="stat-num">' + cats.length + '</div><div class="stat-label">分类目录</div></div><div class="stat-item"><div class="stat-num">' + totalFiles + '</div><div class="stat-label">知识文件</div></div><div class="stat-item"><div class="stat-num">' + (totalSize / 1024).toFixed(0) + '</div><div class="stat-label">KB 总容量</div></div></div>'
     + '<div class="categories-grid">' + catsHtml + '</div>'
-    + '</div>'
-    + '<div class="tools-section"><h3>📚 POM 学习工具</h3><div class="tools-grid">'
-    + '<a class="tool-card" href="https://yikezhong1.github.io/pom-training/quiz.html" target="_blank"><div class="tool-icon">🧠</div><div><div class="tool-name">知识闯关</div><div class="tool-desc">400 道精选题目，测试你的 POM 知识水平</div></div></a>'
-    + '<a class="tool-card" href="https://yikezhong1.github.io/pom-training/animation.html" target="_blank"><div class="tool-icon">🎬</div><div><div class="tool-name">交互动画</div><div class="tool-desc">13 个生产场景动画，直观理解工艺流程</div></div></a>'
-    + '</div></div>';
+    + '</div>';
   if (kbData.readme) {
     html += '<div style="max-width:860px;margin:30px auto 0"><div class="md-content">' + kbData.readme + '</div></div>';
   }
   document.getElementById('contentWrap').innerHTML = html;
 }
 
-/* ===== 首页搜索 ===== */
+/* ===== 搜索（站内/站外） ===== */
+function switchSearchTab(mode, btn) {
+  searchMode = mode;
+  document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+  var input = document.getElementById('homeSearchInput');
+  var results = document.getElementById('homeSearchResults');
+  var webBtn = document.getElementById('webSearchBtn');
+  if (mode === 'local') {
+    input.placeholder = '搜索知识库内容...';
+    webBtn.classList.remove('show');
+    if (results) results.innerHTML = '';
+  } else {
+    input.placeholder = '输入关键词搜索网络内容，按回车搜索...';
+    webBtn.classList.add('show');
+    if (results) results.innerHTML = '';
+  }
+  input.value = '';
+  input.focus();
+}
+
+function doWebSearch(query) {
+  query = (query || '').trim();
+  if (!query) return;
+  window.open('https://www.baidu.com/s?wd=' + encodeURIComponent(query + ' 聚甲醛'), '_blank');
+}
+
 function onHomeSearch(val) {
+  if (searchMode !== 'local') return;
   var container = document.getElementById('homeSearchResults');
   if (!container) return;
   val = val.trim().toLowerCase();
   if (!val) { container.innerHTML = ''; return; }
   var results = [];
   for (var catKey in kbData.categories) {
+    /* 未解锁的加密分类不纳入搜索 */
+    if (isProtected(catKey) && !unlocked) continue;
     var cat = kbData.categories[catKey];
     (cat.files || []).forEach(function(f) {
       if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: '' });
@@ -647,13 +724,11 @@ function onHomeSearch(val) {
   var html = '<div class="search-results"><div class="sr-title">找到 ' + results.length + ' 个结果</div>';
   for (var i = 0; i < results.length && i < 20; i++) {
     var r = results[i];
-    var locked = isProtected(r.cat) && !unlocked;
     var sfAttr = r.subfolder ? encodeURIComponent(r.subfolder) : '';
     html += '<div class="sr-item" onclick="openFile(\'' + r.cat + '\',\'' + r.file.filename + '\',\'' + sfAttr + '\')">'
       + '<span class="sr-icon">' + r.catIcon + '</span>'
       + '<span class="sr-name">' + r.file.name + '</span>'
       + '<span class="sr-cat">' + r.catLabel + (r.subfolder ? ' / ' + r.subfolder : '') + '</span>'
-      + (locked ? '<span class="sr-lock">🔒</span>' : '')
       + '</div>';
   }
   html += '</div>';
@@ -696,7 +771,6 @@ function showCategoryPage(catKey) {
   }
   (cat.subfolders || []).forEach(function(sub) {
     var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
-    var groupFiles = allFiles.filter(function(x) { return x.sub.indexOf(sub.name + '/') === 0; });
     if (subFiles.length > 0) {
       html += '<div class="cp-sub-title">📂 ' + sub.name + '</div><div class="cp-file-grid">';
       subFiles.forEach(function(x) {
@@ -706,10 +780,9 @@ function showCategoryPage(catKey) {
       html += '</div>';
     }
     (sub.groups || []).forEach(function(g) {
-      var gFiles = g.files;
-      if (gFiles.length > 0) {
+      if (g.files.length > 0) {
         html += '<div class="cp-sub-title">📅 ' + sub.name + ' / ' + g.name + '</div><div class="cp-file-grid">';
-        gFiles.forEach(function(f) {
+        g.files.forEach(function(f) {
           var gfPath = encodeURIComponent(sub.name + '/' + g.name);
           html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + f.filename + '\',\'' + gfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + f.name + '</span><span class="cp-ext ' + f.ext + '">' + f.ext + '</span></div>';
         });
@@ -722,7 +795,7 @@ function showCategoryPage(catKey) {
   document.getElementById('contentWrap').scrollTop = 0;
 }
 
-/* ===== 复制与其他 ===== */
+/* ===== 复制 ===== */
 async function copyContent() {
   if (!currentFile) return;
   var cat = kbData.categories[currentFile.category];
