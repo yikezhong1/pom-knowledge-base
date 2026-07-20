@@ -25,26 +25,16 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  height: 100vh;
-  display: flex;
-  overflow: hidden;
+  background: var(--bg-primary); color: var(--text-primary);
+  height: 100vh; display: flex; overflow: hidden;
 }
 .sidebar {
-  width: 300px;
-  min-width: 300px;
-  background: var(--bg-sidebar);
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  width: 300px; min-width: 300px; background: var(--bg-sidebar);
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
 }
 .sidebar-header {
-  padding: 20px 18px 14px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  cursor: pointer;
-  transition: background .15s;
+  padding: 20px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.08);
+  cursor: pointer; transition: background .15s;
 }
 .sidebar-header:hover { background: var(--bg-sidebar-hover); }
 .sidebar-header h1 { color: #fff; font-size: 17px; font-weight: 700; letter-spacing: .5px; }
@@ -74,6 +64,7 @@ body {
   margin-left: 6px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.5);
   font-size: 11px; padding: 1px 6px; border-radius: 10px; font-weight: 400;
 }
+.cat-header .lock-badge { margin-left: 4px; font-size: 11px; opacity: .6; }
 .cat-files { display: none; }
 .cat-files.open { display: block; }
 .file-item {
@@ -130,22 +121,106 @@ body {
 }
 .topbar-actions button:hover { border-color: var(--accent); color: var(--accent); }
 .content-wrap { flex: 1; overflow-y: auto; padding: 28px 36px 60px; }
-.welcome { max-width: 680px; margin: 40px auto; text-align: center; }
+.welcome { max-width: 760px; margin: 30px auto; text-align: center; }
 .welcome h2 { font-size: 26px; font-weight: 700; margin-bottom: 12px; }
 .welcome p { color: var(--text-secondary); font-size: 15px; line-height: 1.8; }
-.welcome .stats { display: flex; justify-content: center; gap: 32px; margin-top: 36px; }
+.welcome .stats { display: flex; justify-content: center; gap: 32px; margin-top: 28px; }
 .welcome .stat-item { text-align: center; }
 .welcome .stat-num { font-size: 32px; font-weight: 700; color: var(--accent); }
 .welcome .stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-.welcome .categories-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 36px; }
+/* 首页搜索框 */
+.home-search { max-width: 520px; margin: 28px auto 0; position: relative; }
+.home-search input {
+  width: 100%; padding: 12px 18px 12px 42px; border-radius: 10px;
+  border: 2px solid var(--border); background: var(--bg-card); font-size: 15px;
+  outline: none; transition: all .2s; color: var(--text-primary);
+}
+.home-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.home-search .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-secondary); pointer-events: none; }
+.search-results { max-width: 760px; margin: 20px auto 0; text-align: left; }
+.search-results .sr-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+.sr-item {
+  display: flex; align-items: center; padding: 10px 16px; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px;
+  cursor: pointer; transition: all .15s;
+}
+.sr-item:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(37,99,235,.06); }
+.sr-item .sr-icon { font-size: 16px; margin-right: 12px; }
+.sr-item .sr-name { font-size: 14px; font-weight: 600; }
+.sr-item .sr-cat { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+.sr-item .sr-lock { font-size: 12px; margin-left: 8px; }
+/* 分类卡片 */
+.welcome .categories-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
 .welcome .cat-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px 12px; cursor: pointer; transition: all .2s;
+  padding: 16px 12px; cursor: pointer; transition: all .2s; position: relative;
 }
 .welcome .cat-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(37,99,235,.08); }
 .welcome .cat-card .cat-icon { font-size: 24px; }
 .welcome .cat-card .cat-name { font-size: 13px; font-weight: 600; margin-top: 8px; }
 .welcome .cat-card .cat-count { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.welcome .cat-card .card-lock { position: absolute; top: 8px; right: 8px; font-size: 12px; opacity: .5; }
+/* 学习工具 */
+.tools-section { max-width: 760px; margin: 32px auto 0; text-align: center; }
+.tools-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--text-primary); }
+.tools-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.tool-card {
+  display: flex; align-items: center; gap: 14px; padding: 18px 20px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; transition: all .2s; text-align: left; text-decoration: none; color: inherit;
+}
+.tool-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(37,99,235,.08); }
+.tool-card .tool-icon { font-size: 32px; }
+.tool-card .tool-name { font-size: 14px; font-weight: 700; }
+.tool-card .tool-desc { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+/* 分类专属页面 */
+.category-page { max-width: 860px; margin: 0 auto; }
+.category-page .cp-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--border); }
+.category-page .cp-icon { font-size: 36px; }
+.category-page .cp-title { font-size: 22px; font-weight: 700; }
+.category-page .cp-count { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.cp-sub-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin: 18px 0 10px; padding-left: 4px; }
+.cp-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.cp-file-card {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; transition: all .15s;
+}
+.cp-file-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(37,99,235,.06); }
+.cp-file-card .cp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.cp-file-card .cp-name { font-size: 13px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-file-card .cp-ext { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--accent-light); color: var(--accent); text-transform: uppercase; font-weight: 600; }
+.cp-file-card .cp-ext.pdf { background: rgba(239,68,68,.1); color: #ef4444; }
+/* 密码弹窗 */
+.pw-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
+  align-items: center; justify-content: center; z-index: 200;
+}
+.pw-overlay.show { display: flex; }
+.pw-dialog {
+  background: var(--bg-card); border-radius: 12px; padding: 32px 28px 24px;
+  width: 340px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.pw-dialog .pw-icon { font-size: 40px; margin-bottom: 12px; }
+.pw-dialog h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+.pw-dialog .pw-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
+.pw-dialog input {
+  width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: 8px;
+  font-size: 15px; text-align: center; outline: none; transition: border .2s; letter-spacing: 2px;
+}
+.pw-dialog input:focus { border-color: var(--accent); }
+.pw-dialog input.error { border-color: #ef4444; animation: shake .3s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+.pw-dialog .pw-btns { display: flex; gap: 10px; margin-top: 16px; }
+.pw-dialog .pw-btns button {
+  flex: 1; padding: 9px 0; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all .15s; border: none;
+}
+.pw-dialog .pw-cancel { background: #f1f5f9; color: var(--text-secondary); }
+.pw-dialog .pw-cancel:hover { background: #e2e8f0; }
+.pw-dialog .pw-confirm { background: var(--accent); color: #fff; }
+.pw-dialog .pw-confirm:hover { background: #1d4ed8; }
+.pw-dialog .pw-error { color: #ef4444; font-size: 12px; margin-top: 8px; display: none; }
+/* 文件内容 */
 .file-meta {
   display: flex; align-items: center; gap: 16px; padding: 10px 16px;
   background: var(--accent-light); border-radius: var(--radius); margin-bottom: 20px;
@@ -184,12 +259,13 @@ body {
   .sidebar { width: 260px; min-width: 260px; }
   .content-wrap { padding: 16px; }
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
+  .tools-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
 <div class="sidebar">
-  <div class="sidebar-header" onclick="showWelcome()">
+  <div class="sidebar-header" onclick="goHome()">
     <h1>POM 知识库</h1>
     <div class="sub">聚甲醛业务知识库</div>
   </div>
@@ -199,6 +275,7 @@ body {
   <div class="file-list" id="fileList"></div>
   <div class="sidebar-footer">
     <button onclick="refreshData()">刷新数据</button>
+    <button onclick="window.open('https://yikezhong1.github.io/pom-training/','_blank')">学习工具</button>
   </div>
 </div>
 <div class="main">
@@ -211,6 +288,20 @@ body {
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<!-- 密码弹窗 -->
+<div class="pw-overlay" id="pwOverlay">
+  <div class="pw-dialog">
+    <div class="pw-icon">🔐</div>
+    <h3>访问验证</h3>
+    <div class="pw-desc">该分类需要输入密码才能访问</div>
+    <input type="password" id="pwInput" placeholder="请输入密码" onkeydown="if(event.key==='Enter')confirmPw()">
+    <div class="pw-error" id="pwError">密码错误，请重新输入</div>
+    <div class="pw-btns">
+      <button class="pw-cancel" onclick="closePwModal()">取消</button>
+      <button class="pw-confirm" onclick="confirmPw()">确认</button>
+    </div>
+  </div>
+</div>
 <script>
 let kbData = null;
 let currentFile = null;
@@ -218,6 +309,48 @@ let openCats = new Set();
 let openSubs = new Set();
 let openGroups = new Set();
 
+/* ===== 密码保护 ===== */
+const PW_HASH = 'cG9tMjAyNg==';  // 密码
+const PROTECTED_CATS = ['03-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
+let unlocked = false;
+let pwCallback = null;
+
+function isProtected(catKey) {
+  return PROTECTED_CATS.some(function(p) { return catKey.indexOf(p) === 0; });
+}
+
+function requireUnlock(catKey, callback) {
+  if (!isProtected(catKey) || unlocked) { callback(); return; }
+  pwCallback = callback;
+  document.getElementById('pwInput').value = '';
+  document.getElementById('pwError').style.display = 'none';
+  document.getElementById('pwInput').classList.remove('error');
+  document.getElementById('pwOverlay').classList.add('show');
+  setTimeout(function() { document.getElementById('pwInput').focus(); }, 100);
+}
+
+function confirmPw() {
+  var val = document.getElementById('pwInput').value;
+  if (btoa(val) === PW_HASH) {
+    unlocked = true;
+    document.getElementById('pwOverlay').classList.remove('show');
+    renderSidebar(document.getElementById('searchInput').value.trim());
+    if (pwCallback) { pwCallback(); pwCallback = null; }
+    showToast('验证成功');
+  } else {
+    document.getElementById('pwError').style.display = 'block';
+    document.getElementById('pwInput').classList.add('error');
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+  }
+}
+
+function closePwModal() {
+  document.getElementById('pwOverlay').classList.remove('show');
+  pwCallback = null;
+}
+
+/* ===== 初始化 ===== */
 async function init() {
   try {
     const res = await fetch('data.json');
@@ -238,17 +371,28 @@ async function refreshData() {
   } catch (e) { showToast('刷新失败'); }
 }
 
+/* ===== 返回首页（收起所有目录 + 刷新数据） ===== */
+function goHome() {
+  openCats.clear();
+  openSubs.clear();
+  openGroups.clear();
+  document.getElementById('searchInput').value = '';
+  refreshData();
+  showWelcome();
+}
+
+/* ===== 侧边栏渲染 ===== */
 function saveOpenState() {
-  document.querySelectorAll('.cat-header.open').forEach(h => {
-    const label = h.querySelector('span:nth-child(2)');
+  document.querySelectorAll('.cat-header.open').forEach(function(h) {
+    var label = h.querySelector('span:nth-child(2)');
     if (label) openCats.add(label.textContent);
   });
-  document.querySelectorAll('.sub-header.open').forEach(h => {
-    const label = h.querySelector('span:nth-child(2)');
+  document.querySelectorAll('.sub-header.open').forEach(function(h) {
+    var label = h.querySelector('span:nth-child(2)');
     if (label) openSubs.add(label.textContent);
   });
-  document.querySelectorAll('.group-header.open').forEach(h => {
-    const label = h.querySelector('span:nth-child(2)');
+  document.querySelectorAll('.group-header.open').forEach(function(h) {
+    var label = h.querySelector('span:nth-child(2)');
     if (label) openGroups.add(label.textContent);
   });
 }
@@ -256,50 +400,58 @@ function saveOpenState() {
 function renderSidebar(filter) {
   saveOpenState();
   filter = filter || '';
-  const el = document.getElementById('fileList');
+  var el = document.getElementById('fileList');
   if (!kbData || !kbData.categories) { el.innerHTML = '<div class="loading">无数据</div>'; return; }
-  const filterLower = filter.toLowerCase();
-  let html = '';
-  for (const [catKey, cat] of Object.entries(kbData.categories)) {
-    let files = cat.files || [];
-    let subfolders = cat.subfolders || [];
+  var filterLower = filter.toLowerCase();
+  var html = '';
+  for (var catKey in kbData.categories) {
+    var cat = kbData.categories[catKey];
+    var files = cat.files || [];
+    var subfolders = cat.subfolders || [];
     if (filterLower) {
-      files = files.filter(f => f.name.toLowerCase().includes(filterLower));
-      subfolders = subfolders.map(sub => {
-        let sf = Object.assign({}, sub);
-        sf.files = (sf.files || []).filter(f => f.name.toLowerCase().includes(filterLower));
-        sf.groups = (sf.groups || []).map(g => ({ name: g.name, files: g.files.filter(f => f.name.toLowerCase().includes(filterLower)) })).filter(g => g.files.length > 0);
+      files = files.filter(function(f) { return f.name.toLowerCase().indexOf(filterLower) >= 0; });
+      subfolders = subfolders.map(function(sub) {
+        var sf = Object.assign({}, sub);
+        sf.files = (sf.files || []).filter(function(f) { return f.name.toLowerCase().indexOf(filterLower) >= 0; });
+        sf.groups = (sf.groups || []).map(function(g) { return { name: g.name, files: g.files.filter(function(f) { return f.name.toLowerCase().indexOf(filterLower) >= 0; }) }; }).filter(function(g) { return g.files.length > 0; });
         return sf;
-      }).filter(sf => sf.files.length > 0 || sf.groups.length > 0);
+      }).filter(function(sf) { return sf.files.length > 0 || sf.groups.length > 0; });
       if (files.length === 0 && subfolders.length === 0) continue;
     }
-    let totalCount = files.length;
-    for (const sub of subfolders) {
-      totalCount += (sub.files || []).length;
-      for (const g of (sub.groups || [])) totalCount += g.files.length;
+    var totalCount = files.length;
+    for (var si = 0; si < subfolders.length; si++) {
+      totalCount += (subfolders[si].files || []).length;
+      for (var gi = 0; gi < (subfolders[si].groups || []).length; gi++) totalCount += subfolders[si].groups[gi].files.length;
     }
-    const isActiveCat = currentFile && currentFile.category === catKey;
-    const isOpen = filterLower || openCats.has(cat.label) || isActiveCat;
-    html += '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="toggleCat(this)"><span class="icon">' + cat.icon + '</span><span>' + cat.label + '</span><span class="count">' + totalCount + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
-    for (const f of files) {
-      const active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && !currentFile.subfolder;
+    var isActiveCat = currentFile && currentFile.category === catKey;
+    var isOpen = filterLower || openCats.has(cat.label) || isActiveCat;
+    var locked = isProtected(catKey) && !unlocked;
+    var lockHtml = locked ? '<span class="lock-badge">🔒</span>' : '';
+    html += '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="onCatClick(this,\'' + catKey + '\')"><span class="icon">' + cat.icon + '</span><span>' + cat.label + '</span>' + lockHtml + '<span class="count">' + totalCount + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
+    for (var fi = 0; fi < files.length; fi++) {
+      var f = files[fi];
+      var active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && !currentFile.subfolder;
       html += '<div class="file-item' + (active ? ' active' : '') + '" onclick="openFile(\'' + f.category + '\',\'' + f.filename + '\',\'\')"><span class="dot"></span><span>' + f.name + '</span><span class="ext-badge ' + f.ext + '">' + f.ext + '</span></div>';
     }
-    for (const sub of subfolders) {
-      const isSubOpen = openSubs.has(sub.name) || filterLower;
+    for (var sj = 0; sj < subfolders.length; sj++) {
+      var sub = subfolders[sj];
+      var isSubOpen = openSubs.has(sub.name) || filterLower;
       html += '<div class="sub-group"><div class="sub-header' + (isSubOpen ? ' open' : '') + '" onclick="toggleSub(this)"><span class="sub-icon">📂</span><span>' + sub.name + '</span><span class="arrow">&#9654;</span></div><div class="sub-files' + (isSubOpen ? ' open' : '') + '">';
-      for (const f of (sub.files || [])) {
-        const active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && currentFile.subfolder === f.subfolder;
-        const sfPath = encodeURIComponent(sub.name);
-        html += '<div class="file-item sub-file' + (active ? ' active' : '') + '" onclick="openFile(\'' + f.category + '\',\'' + f.filename + '\',\'' + sfPath + '\')"><span class="dot"></span><span>' + f.name + '</span><span class="ext-badge ' + f.ext + '">' + f.ext + '</span></div>';
+      for (var sf2 = 0; sf2 < (sub.files || []).length; sf2++) {
+        var sfFile = sub.files[sf2];
+        var sfActive = currentFile && currentFile.category === sfFile.category && currentFile.filename === sfFile.filename && currentFile.subfolder === sfFile.subfolder;
+        var sfPath = encodeURIComponent(sub.name);
+        html += '<div class="file-item sub-file' + (sfActive ? ' active' : '') + '" onclick="openFile(\'' + sfFile.category + '\',\'' + sfFile.filename + '\',\'' + sfPath + '\')"><span class="dot"></span><span>' + sfFile.name + '</span><span class="ext-badge ' + sfFile.ext + '">' + sfFile.ext + '</span></div>';
       }
-      for (const g of (sub.groups || [])) {
-        const isGroupOpen = openGroups.has(g.name) || filterLower;
+      for (var gk = 0; gk < (sub.groups || []).length; gk++) {
+        var g = sub.groups[gk];
+        var isGroupOpen = openGroups.has(g.name) || filterLower;
         html += '<div class="group-wrap"><div class="group-header' + (isGroupOpen ? ' open' : '') + '" onclick="toggleGroup(this)"><span class="g-icon">📅</span><span>' + g.name + '</span><span class="arrow">&#9654;</span></div><div class="group-files' + (isGroupOpen ? ' open' : '') + '">';
-        for (const f of g.files) {
-          const active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && currentFile.subfolder === f.subfolder;
-          const sfPath = encodeURIComponent(sub.name + '/' + g.name);
-          html += '<div class="file-item group-file' + (active ? ' active' : '') + '" onclick="openFile(\'' + f.category + '\',\'' + f.filename + '\',\'' + sfPath + '\')"><span class="dot"></span><span>' + f.name + '</span><span class="ext-badge ' + f.ext + '">' + f.ext + '</span></div>';
+        for (var gf = 0; gf < g.files.length; gf++) {
+          var gfFile = g.files[gf];
+          var gfActive = currentFile && currentFile.category === gfFile.category && currentFile.filename === gfFile.filename && currentFile.subfolder === gfFile.subfolder;
+          var gfPath = encodeURIComponent(sub.name + '/' + g.name);
+          html += '<div class="file-item group-file' + (gfActive ? ' active' : '') + '" onclick="openFile(\'' + gfFile.category + '\',\'' + gfFile.filename + '\',\'' + gfPath + '\')"><span class="dot"></span><span>' + gfFile.name + '</span><span class="ext-badge ' + gfFile.ext + '">' + gfFile.ext + '</span></div>';
         }
         html += '</div></div>';
       }
@@ -310,10 +462,24 @@ function renderSidebar(filter) {
   el.innerHTML = html;
 }
 
+function onCatClick(el, catKey) {
+  if (isProtected(catKey) && !unlocked) {
+    requireUnlock(catKey, function() {
+      el.classList.add('open');
+      el.nextElementSibling.classList.add('open');
+      var label = el.querySelector('span:nth-child(2)');
+      if (label) openCats.add(label.textContent);
+      renderSidebar(document.getElementById('searchInput').value.trim());
+    });
+    return;
+  }
+  toggleCat(el);
+}
+
 function toggleCat(el) {
   el.classList.toggle('open');
   el.nextElementSibling.classList.toggle('open');
-  const label = el.querySelector('span:nth-child(2)');
+  var label = el.querySelector('span:nth-child(2)');
   if (label) {
     if (el.classList.contains('open')) openCats.add(label.textContent);
     else openCats.delete(label.textContent);
@@ -323,7 +489,7 @@ function toggleCat(el) {
 function toggleSub(el) {
   el.classList.toggle('open');
   el.nextElementSibling.classList.toggle('open');
-  const label = el.querySelector('span:nth-child(2)');
+  var label = el.querySelector('span:nth-child(2)');
   if (label) {
     if (el.classList.contains('open')) openSubs.add(label.textContent);
     else openSubs.delete(label.textContent);
@@ -333,7 +499,7 @@ function toggleSub(el) {
 function toggleGroup(el) {
   el.classList.toggle('open');
   el.nextElementSibling.classList.toggle('open');
-  const label = el.querySelector('span:nth-child(2)');
+  var label = el.querySelector('span:nth-child(2)');
   if (label) {
     if (el.classList.contains('open')) openGroups.add(label.textContent);
     else openGroups.delete(label.textContent);
@@ -342,70 +508,73 @@ function toggleGroup(el) {
 
 function onSearch(val) { renderSidebar(val.trim()); }
 
+/* ===== 文件查找与打开 ===== */
 function findFileInCat(cat, filename, subfolder) {
-  // 在直接文件中查找
   if (!subfolder) {
-    const f = (cat.files || []).find(f => f.filename === filename);
+    var f = (cat.files || []).find(function(f) { return f.filename === filename; });
     if (f) return f;
   }
-  // 在子文件夹中查找
-  for (const sub of (cat.subfolders || [])) {
+  for (var i = 0; i < (cat.subfolders || []).length; i++) {
+    var sub = cat.subfolders[i];
     if (subfolder === sub.name) {
-      const f = (sub.files || []).find(f => f.filename === filename);
-      if (f) return f;
+      var sf = (sub.files || []).find(function(f) { return f.filename === filename; });
+      if (sf) return sf;
     }
-    for (const g of (sub.groups || [])) {
-      if (subfolder === sub.name + '/' + g.name) {
-        const f = g.files.find(f => f.filename === filename);
-        if (f) return f;
+    for (var j = 0; j < (sub.groups || []).length; j++) {
+      if (subfolder === sub.name + '/' + sub.groups[j].name) {
+        var gf = sub.groups[j].files.find(function(f) { return f.filename === filename; });
+        if (gf) return gf;
       }
     }
   }
-  // 兜底：全量搜索
-  for (const sub of (cat.subfolders || [])) {
-    for (const f of (sub.files || [])) { if (f.filename === filename) return f; }
-    for (const g of (sub.groups || [])) {
-      for (const f of g.files) { if (f.filename === filename) return f; }
+  for (var k = 0; k < (cat.subfolders || []).length; k++) {
+    var s2 = cat.subfolders[k];
+    for (var a = 0; a < (s2.files || []).length; a++) { if (s2.files[a].filename === filename) return s2.files[a]; }
+    for (var b = 0; b < (s2.groups || []).length; b++) {
+      for (var c = 0; c < s2.groups[b].files.length; c++) { if (s2.groups[b].files[c].filename === filename) return s2.groups[b].files[c]; }
     }
   }
   return null;
 }
 
 function openFile(category, filename, subfolder) {
-  currentFile = { category, filename, subfolder: subfolder || '' };
+  if (isProtected(category) && !unlocked) {
+    requireUnlock(category, function() { openFile(category, filename, subfolder); });
+    return;
+  }
+  currentFile = { category: category, filename: filename, subfolder: subfolder || '' };
   renderSidebar(document.getElementById('searchInput').value.trim());
-  const content = document.getElementById('contentWrap');
-  const catMeta = kbData.categories[category];
-  const file = findFileInCat(catMeta, filename, subfolder);
+  var content = document.getElementById('contentWrap');
+  var catMeta = kbData.categories[category];
+  var file = findFileInCat(catMeta, filename, subfolder);
   if (!file) return;
-
-  let breadPath = catMeta.icon + ' ' + catMeta.label;
+  var breadPath = catMeta.icon + ' ' + catMeta.label;
   if (subfolder) breadPath += ' / ' + decodeURIComponent(subfolder).replace(/\//g, ' / ');
   breadPath += ' / <span>' + file.name + '</span>';
   document.getElementById('breadcrumb').innerHTML = breadPath;
-
-  const actions = document.getElementById('topbarActions');
+  var actions = document.getElementById('topbarActions');
   if (file.ext === 'pdf') {
     actions.innerHTML = '';
     content.innerHTML = '<div class="pdf-notice"><div class="icon">📄</div><p>这是一个 PDF 文件</p><p style="margin-top:8px;font-size:13px;color:#94a3b8">PDF 文件不支持在线预览</p></div>';
     return;
   }
-
   actions.innerHTML = '<button onclick="copyContent()">复制内容</button>';
-  const modDate = new Date(file.modified).toLocaleString('zh-CN');
-  const sizeKB = (file.size / 1024).toFixed(1);
-  const subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
+  var modDate = new Date(file.modified).toLocaleString('zh-CN');
+  var sizeKB = (file.size / 1024).toFixed(1);
+  var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
   content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div><div class="md-content">' + file.html + '</div>';
   content.scrollTop = 0;
 }
 
+/* ===== 首页 ===== */
 function showWelcome() {
   if (!kbData) return;
   currentFile = null;
   renderSidebar();
-  const cats = Object.entries(kbData.categories || {});
-  let totalFiles = 0, totalSize = 0;
-  cats.forEach(function([, c]) {
+  var cats = Object.entries(kbData.categories || {});
+  var totalFiles = 0, totalSize = 0;
+  cats.forEach(function(entry) {
+    var c = entry[1];
     totalFiles += (c.files || []).length;
     (c.files || []).forEach(function(f) { totalSize += f.size; });
     (c.subfolders || []).forEach(function(sub) {
@@ -417,48 +586,155 @@ function showWelcome() {
       });
     });
   });
-  let catsHtml = '';
-  for (const [key, cat] of cats) {
-    let catTotal = (cat.files || []).length;
+  var catsHtml = '';
+  for (var i = 0; i < cats.length; i++) {
+    var key = cats[i][0], cat = cats[i][1];
+    var catTotal = (cat.files || []).length;
     (cat.subfolders || []).forEach(function(sub) {
       catTotal += (sub.files || []).length;
       (sub.groups || []).forEach(function(g) { catTotal += g.files.length; });
     });
-    catsHtml += '<div class="cat-card" onclick="expandCategory(\'' + key + '\')"><div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
+    var lockIcon = isProtected(key) && !unlocked ? '<div class="card-lock">🔒</div>' : '';
+    catsHtml += '<div class="cat-card" onclick="onCatCardClick(\'' + key + '\')">' + lockIcon + '<div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
   }
   document.getElementById('breadcrumb').innerHTML = '知识库首页';
   document.getElementById('topbarActions').innerHTML = '';
-  let html = '<div class="welcome"><h2>POM 聚甲醛知识库</h2><p>涵盖基础知识、产品知识、换料案例、销售话术、行情资讯等全方位业务资料</p><div class="stats"><div class="stat-item"><div class="stat-num">' + cats.length + '</div><div class="stat-label">分类目录</div></div><div class="stat-item"><div class="stat-num">' + totalFiles + '</div><div class="stat-label">知识文件</div></div><div class="stat-item"><div class="stat-num">' + (totalSize / 1024).toFixed(0) + '</div><div class="stat-label">KB 总容量</div></div></div><div class="categories-grid">' + catsHtml + '</div></div>';
+  var html = '<div class="welcome">'
+    + '<h2>POM 聚甲醛知识库</h2>'
+    + '<p>涵盖基础知识、产品知识、换料案例、销售话术、行情资讯等全方位业务资料</p>'
+    + '<div class="home-search"><span class="search-icon">🔍</span><input type="text" id="homeSearchInput" placeholder="搜索知识库内容..." oninput="onHomeSearch(this.value)"></div>'
+    + '<div id="homeSearchResults"></div>'
+    + '<div class="stats"><div class="stat-item"><div class="stat-num">' + cats.length + '</div><div class="stat-label">分类目录</div></div><div class="stat-item"><div class="stat-num">' + totalFiles + '</div><div class="stat-label">知识文件</div></div><div class="stat-item"><div class="stat-num">' + (totalSize / 1024).toFixed(0) + '</div><div class="stat-label">KB 总容量</div></div></div>'
+    + '<div class="categories-grid">' + catsHtml + '</div>'
+    + '</div>'
+    + '<div class="tools-section"><h3>📚 POM 学习工具</h3><div class="tools-grid">'
+    + '<a class="tool-card" href="https://yikezhong1.github.io/pom-training/quiz.html" target="_blank"><div class="tool-icon">🧠</div><div><div class="tool-name">知识闯关</div><div class="tool-desc">400 道精选题目，测试你的 POM 知识水平</div></div></a>'
+    + '<a class="tool-card" href="https://yikezhong1.github.io/pom-training/animation.html" target="_blank"><div class="tool-icon">🎬</div><div><div class="tool-name">交互动画</div><div class="tool-desc">13 个生产场景动画，直观理解工艺流程</div></div></a>'
+    + '</div></div>';
   if (kbData.readme) {
     html += '<div style="max-width:860px;margin:30px auto 0"><div class="md-content">' + kbData.readme + '</div></div>';
   }
   document.getElementById('contentWrap').innerHTML = html;
 }
 
-function expandCategory(catKey) {
-  const cat = kbData.categories[catKey];
-  if (!cat) return;
-  document.querySelectorAll('.cat-header').forEach(function(h) {
-    const label = h.querySelector('span:nth-child(2)');
-    if (label && label.textContent === cat.label) {
-      h.classList.add('open');
-      h.nextElementSibling.classList.add('open');
-    }
-  });
+/* ===== 首页搜索 ===== */
+function onHomeSearch(val) {
+  var container = document.getElementById('homeSearchResults');
+  if (!container) return;
+  val = val.trim().toLowerCase();
+  if (!val) { container.innerHTML = ''; return; }
+  var results = [];
+  for (var catKey in kbData.categories) {
+    var cat = kbData.categories[catKey];
+    (cat.files || []).forEach(function(f) {
+      if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: '' });
+    });
+    (cat.subfolders || []).forEach(function(sub) {
+      (sub.files || []).forEach(function(f) {
+        if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: sub.name });
+      });
+      (sub.groups || []).forEach(function(g) {
+        g.files.forEach(function(f) {
+          if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: sub.name + '/' + g.name });
+        });
+      });
+    });
+  }
+  if (results.length === 0) {
+    container.innerHTML = '<div class="search-results"><div class="sr-title">未找到匹配的文件</div></div>';
+    return;
+  }
+  var html = '<div class="search-results"><div class="sr-title">找到 ' + results.length + ' 个结果</div>';
+  for (var i = 0; i < results.length && i < 20; i++) {
+    var r = results[i];
+    var locked = isProtected(r.cat) && !unlocked;
+    var sfAttr = r.subfolder ? encodeURIComponent(r.subfolder) : '';
+    html += '<div class="sr-item" onclick="openFile(\'' + r.cat + '\',\'' + r.file.filename + '\',\'' + sfAttr + '\')">'
+      + '<span class="sr-icon">' + r.catIcon + '</span>'
+      + '<span class="sr-name">' + r.file.name + '</span>'
+      + '<span class="sr-cat">' + r.catLabel + (r.subfolder ? ' / ' + r.subfolder : '') + '</span>'
+      + (locked ? '<span class="sr-lock">🔒</span>' : '')
+      + '</div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
 }
 
+/* ===== 分类专属页面 ===== */
+function onCatCardClick(catKey) {
+  if (isProtected(catKey) && !unlocked) {
+    requireUnlock(catKey, function() { showCategoryPage(catKey); });
+    return;
+  }
+  showCategoryPage(catKey);
+}
+
+function showCategoryPage(catKey) {
+  var cat = kbData.categories[catKey];
+  if (!cat) return;
+  currentFile = null;
+  openCats.add(cat.label);
+  renderSidebar();
+  var allFiles = [];
+  (cat.files || []).forEach(function(f) { allFiles.push({ file: f, sub: '' }); });
+  (cat.subfolders || []).forEach(function(sub) {
+    (sub.files || []).forEach(function(f) { allFiles.push({ file: f, sub: sub.name }); });
+    (sub.groups || []).forEach(function(g) {
+      g.files.forEach(function(f) { allFiles.push({ file: f, sub: sub.name + '/' + g.name }); });
+    });
+  });
+  document.getElementById('breadcrumb').innerHTML = cat.icon + ' <span>' + cat.label + '</span>';
+  document.getElementById('topbarActions').innerHTML = '';
+  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">' + cat.icon + '</div><div><div class="cp-title">' + cat.label + '</div><div class="cp-count">' + allFiles.length + ' 个文件</div></div></div>';
+  var directFiles = allFiles.filter(function(x) { return !x.sub; });
+  if (directFiles.length > 0) {
+    html += '<div class="cp-file-grid">';
+    directFiles.forEach(function(x) {
+      html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
+    });
+    html += '</div>';
+  }
+  (cat.subfolders || []).forEach(function(sub) {
+    var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
+    var groupFiles = allFiles.filter(function(x) { return x.sub.indexOf(sub.name + '/') === 0; });
+    if (subFiles.length > 0) {
+      html += '<div class="cp-sub-title">📂 ' + sub.name + '</div><div class="cp-file-grid">';
+      subFiles.forEach(function(x) {
+        var sfPath = encodeURIComponent(sub.name);
+        html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'' + sfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
+      });
+      html += '</div>';
+    }
+    (sub.groups || []).forEach(function(g) {
+      var gFiles = g.files;
+      if (gFiles.length > 0) {
+        html += '<div class="cp-sub-title">📅 ' + sub.name + ' / ' + g.name + '</div><div class="cp-file-grid">';
+        gFiles.forEach(function(f) {
+          var gfPath = encodeURIComponent(sub.name + '/' + g.name);
+          html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + f.filename + '\',\'' + gfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + f.name + '</span><span class="cp-ext ' + f.ext + '">' + f.ext + '</span></div>';
+        });
+        html += '</div>';
+      }
+    });
+  });
+  html += '</div>';
+  document.getElementById('contentWrap').innerHTML = html;
+  document.getElementById('contentWrap').scrollTop = 0;
+}
+
+/* ===== 复制与其他 ===== */
 async function copyContent() {
   if (!currentFile) return;
-  const cat = kbData.categories[currentFile.category];
-  const file = findFileInCat(cat, currentFile.filename, currentFile.subfolder);
+  var cat = kbData.categories[currentFile.category];
+  var file = findFileInCat(cat, currentFile.filename, currentFile.subfolder);
   if (file && file.content) {
     try { await navigator.clipboard.writeText(file.content); showToast('已复制到剪贴板'); }
-    catch { showToast('复制失败'); }
+    catch(e) { showToast('复制失败'); }
   }
 }
 
 function showToast(msg) {
-  const el = document.getElementById('toast');
+  var el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   setTimeout(function() { el.classList.remove('show'); }, 2500);
