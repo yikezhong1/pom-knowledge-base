@@ -366,7 +366,7 @@ body {
   <div class="pw-dialog">
     <div class="pw-icon">🗑️</div>
     <h3>删除客户档案</h3>
-    <div class="pw-desc">确定要删除客户「<span id="delCustomerName" style="color:var(--text-primary);font-weight:600"></span>」的档案吗？<br>删除后无法恢复。</div>
+    <div class="pw-desc">确定要删除客户「<span id="delCustomerName" style="color:var(--text-primary);font-weight:600"></span>」的档案吗？<br>删除后页面不再显示，原始数据将保留备份并记录删除时间。</div>
     <div class="pw-btns">
       <button class="pw-cancel" onclick="closeDeleteModal()">取消</button>
       <button class="pw-confirm" id="delConfirmBtn" style="background:#ef4444" onclick="executeDeleteCustomer()">确认删除</button>
@@ -567,8 +567,9 @@ function mergeCustomers() {
   if (cat.subfolders) {
     cat.subfolders = cat.subfolders.filter(function(sub) { return sub.name !== '现有客户档案'; });
   }
-  /* 保存客户记录用于横向表格显示（最新的在前） */
-  var records = (customersData && customersData.records) ? customersData.records.slice().reverse() : [];
+  /* 保存客户记录用于横向表格显示（过滤已删除记录，最新的在前） */
+  var all = (customersData && customersData.records) ? customersData.records : [];
+  var records = all.filter(function(r) { return r.deleted !== true; }).slice().reverse();
   cat._customerRecords = records;
 }
 
@@ -1054,25 +1055,22 @@ async function executeDeleteCustomer() {
   var cat = kbData.categories['05-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
+  if (!rec) { closeDeleteModal(); return; }
   var btn = document.getElementById('delConfirmBtn');
   btn.disabled = true;
   btn.textContent = '删除中...';
   try {
-    /* 获取最新 SHA */
+    /* 软删除：打标记+记录删除时间，原始数据保留在 customers.json 中（rec 与 customersData.records 中是同一对象引用） */
+    rec.deleted = true;
+    rec.deletedTime = new Date().toISOString();
+    /* 获取最新 SHA 并推送 */
     var sha = await ghGetSha('customers.json');
-    /* 从显示列表（最新在前）中移除，再还原为存储顺序（最旧在前） */
-    var displayRecords = records.slice();
-    displayRecords.splice(index, 1);
-    var newRecords = displayRecords.slice().reverse();
-    var newData = { records: newRecords };
-    /* 推送到 GitHub */
-    await ghPutFile('customers.json', JSON.stringify(newData, null, 2), sha);
-    /* 更新本地数据 */
-    customersData = newData;
+    await ghPutFile('customers.json', JSON.stringify(customersData, null, 2), sha);
+    /* 更新本地显示（过滤已删除记录） */
     mergeCustomers();
     renderSidebar();
     closeDeleteModal();
-    showToast('已删除客户「' + (rec.customerName || '') + '」');
+    showToast('已删除客户「' + (rec.customerName || '') + '」（原始数据已保留备份）');
     showCustomerTable();
   } catch (e) {
     showToast('删除失败：' + e.message);
