@@ -194,6 +194,24 @@ body {
   font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; margin-bottom: 20px;
 }
 .cp-action-btn:hover { background: #1d4ed8; }
+/* 客户档案表格 */
+.customer-table-wrap { overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.customer-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+.customer-table th, .customer-table td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; white-space: nowrap; }
+.customer-table th { background: #f1f5f9; font-weight: 600; color: var(--accent); position: sticky; top: 0; }
+.customer-table tbody tr { cursor: pointer; transition: background .12s; }
+.customer-table tbody tr:hover { background: var(--accent-light); }
+.customer-table .ct-idx { text-align: center; color: var(--text-secondary); font-weight: 600; }
+.customer-table .ct-name { font-weight: 600; color: var(--text-primary); }
+/* 定位按钮 */
+.loc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.loc-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  background: #10b981; color: #fff; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap;
+}
+.loc-btn:hover { background: #059669; }
+.loc-status { font-size: 12px; color: var(--text-secondary); }
 /* 密码弹窗 */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
@@ -529,33 +547,13 @@ function mergeCustomers() {
   var catKey = '05-客户档案';
   var cat = kbData.categories[catKey];
   if (!cat) return;
-  /* 移除之前合并的在线记录 */
+  /* 移除旧版子文件夹形式的在线记录 */
   if (cat.subfolders) {
     cat.subfolders = cat.subfolders.filter(function(sub) { return sub.name !== '现有客户档案'; });
   }
-  if (!customersData || !customersData.records || customersData.records.length === 0) return;
-  /* 构建在线客户档案子文件夹 */
-  var files = [];
-  var records = customersData.records.slice().reverse();
-  for (var i = 0; i < records.length; i++) {
-    var rec = records[i];
-    var name = rec.customerName || ('客户档案 ' + (i + 1));
-    files.push({
-      name: name,
-      filename: 'customer_' + i + '.json',
-      category: catKey,
-      subfolder: '现有客户档案',
-      ext: '在线',
-      size: JSON.stringify(rec).length,
-      modified: rec.entryTime || new Date().toISOString(),
-      html: '<div class="md-content">' + marked.parse(generateCustomerMd(rec)) + '</div>',
-      content: generateCustomerMd(rec),
-      _customer: true,
-      _record: rec
-    });
-  }
-  if (!cat.subfolders) cat.subfolders = [];
-  cat.subfolders.push({ name: '现有客户档案', files: files, groups: [] });
+  /* 保存客户记录用于横向表格显示（最新的在前） */
+  var records = (customersData && customersData.records) ? customersData.records.slice().reverse() : [];
+  cat._customerRecords = records;
 }
 
 function generateCustomerMd(rec) {
@@ -641,9 +639,11 @@ function renderSidebar(filter) {
     var locked = isProtected(catKey) && !unlocked;
     var lockHtml = locked ? '<span class="lock-badge">🔒</span>' : '';
     html += '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="onCatClick(this,\'' + catKey + '\')"><span class="icon">' + cat.icon + '</span><span>' + cat.label + '</span>' + lockHtml + '<span class="count">' + totalCount + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
-    /* 客户档案分类：添加在线填报入口 */
+    /* 客户档案分类：添加在线填报入口和现有客户档案表格入口 */
     if (catKey.indexOf('05-客户档案') === 0 && !locked) {
       html += '<div class="file-item" onclick="showCustomerForm()"><span class="dot" style="background:#f59e0b"></span><span>📝 在线填报新客户</span><span class="ext-badge form">填报</span></div>';
+      var custCount = (cat._customerRecords || []).length;
+      html += '<div class="file-item" onclick="showCustomerTable()"><span class="dot" style="background:#10b981"></span><span>📋 现有客户档案</span><span class="ext-badge form">' + custCount + '</span></div>';
     }
     for (var fi = 0; fi < files.length; fi++) {
       var f = files[fi];
@@ -804,6 +804,10 @@ function showCustomerForm() {
     var isFirst = s === 0;
     html += '<div class="form-section"><div class="form-section-title' + (isFirst ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
     html += '<div class="form-section-body' + (isFirst ? ' open' : '') + '">';
+    /* 位置信息板块：添加手机定位按钮 */
+    if (section.title === '位置信息') {
+      html += '<div class="loc-row"><button type="button" class="loc-btn" onclick="getLocation()">📍 获取当前位置</button><span class="loc-status" id="locStatus">点击自动读取手机定位，填入经纬度</span></div>';
+    }
     var fields = section.fields;
     for (var f = 0; f < fields.length; f++) {
       var field = fields[f];
@@ -830,11 +834,38 @@ function showCustomerForm() {
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
+  /* 自动获取手机位置（需用户授权） */
+  setTimeout(function() { getLocation(); }, 300);
 }
 
 function toggleFormSection(el) {
   el.classList.toggle('open');
   el.nextElementSibling.classList.toggle('open');
+}
+
+/* ===== 手机定位 ===== */
+function getLocation() {
+  var statusEl = document.getElementById('locStatus');
+  var coordEl = document.getElementById('field_coordinates');
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = '您的浏览器不支持定位功能，请手动填写';
+    return;
+  }
+  if (statusEl) statusEl.textContent = '正在获取位置，请允许定位权限...';
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude.toFixed(6);
+    var lng = pos.coords.longitude.toFixed(6);
+    if (coordEl) coordEl.value = lat + ',' + lng;
+    if (statusEl) statusEl.textContent = '✅ 已获取：' + lat + ', ' + lng;
+    showToast('位置获取成功');
+  }, function(err) {
+    var msg = '定位失败';
+    if (err.code === 1) msg = '定位失败：您拒绝了位置权限，请在浏览器设置中允许后重试';
+    else if (err.code === 2) msg = '定位失败：无法获取位置信息，请检查GPS是否开启';
+    else if (err.code === 3) msg = '定位失败：获取位置超时，请重试';
+    if (statusEl) statusEl.textContent = msg;
+    showToast(msg);
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
 function resetCustomerForm() {
@@ -891,13 +922,53 @@ async function submitCustomerForm() {
     mergeCustomers();
     renderSidebar();
     showToast('提交成功！客户「' + record.customerName + '」已保存');
-    /* 显示分类页面 */
-    setTimeout(function() { showCategoryPage('05-客户档案'); }, 800);
+    /* 显示客户表格 */
+    setTimeout(function() { showCustomerTable(); }, 800);
   } catch (e) {
     showToast('提交失败：' + e.message);
     btn.disabled = false;
     btn.textContent = '提交客户档案';
   }
+}
+
+/* ===== 现有客户档案表格 ===== */
+function showCustomerTable() {
+  if (isProtected('05-客户档案') && !unlocked) {
+    requireUnlock('05-客户档案', function() { showCustomerTable(); });
+    return;
+  }
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  currentFile = null;
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案';
+  document.getElementById('topbarActions').innerHTML = '';
+  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📋</div><div><div class="cp-title">现有客户档案</div><div class="cp-count">共 ' + records.length + ' 位客户（点击行查看详情）</div></div></div>';
+  html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
+  if (records.length === 0) {
+    html += '<div style="text-align:center;padding:60px 20px;color:var(--text-secondary)"><div style="font-size:48px;margin-bottom:16px">📭</div><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
+  } else {
+    html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th></tr></thead><tbody>';
+    for (var i = 0; i < records.length; i++) {
+      var rec = records[i];
+      html += '<tr onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td></tr>';
+    }
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  document.getElementById('contentWrap').innerHTML = html;
+  document.getElementById('contentWrap').scrollTop = 0;
+}
+
+function showCustomerDetail(index) {
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  var rec = records[index];
+  if (!rec) return;
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + (rec.customerName || '') + '</span>';
+  document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">返回列表</button>';
+  document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + marked.parse(generateCustomerMd(rec)) + '</div>';
+  document.getElementById('contentWrap').scrollTop = 0;
 }
 
 /* ===== GitHub API 操作 ===== */
@@ -1113,6 +1184,25 @@ function showCategoryPage(catKey) {
       html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
     });
     html += '</div>';
+  }
+  /* 客户档案分类：直接渲染现有客户档案表格 */
+  if (catKey.indexOf('05-客户档案') === 0) {
+    var custRecords = cat._customerRecords || [];
+    html += '<div class="cp-sub-title">📋 现有客户档案（共 ' + custRecords.length + ' 位客户，点击行查看详情）</div>';
+    if (custRecords.length === 0) {
+      html += '<div style="text-align:center;padding:40px 20px;color:var(--text-secondary);background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--radius)"><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
+    } else {
+      html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th></tr></thead><tbody>';
+      for (var ci = 0; ci < custRecords.length; ci++) {
+        var crec = custRecords[ci];
+        html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td></tr>';
+      }
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+    document.getElementById('contentWrap').innerHTML = html;
+    document.getElementById('contentWrap').scrollTop = 0;
+    return;
   }
   (cat.subfolders || []).forEach(function(sub) {
     var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
