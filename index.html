@@ -203,6 +203,11 @@ body {
 .customer-table tbody tr:hover { background: var(--accent-light); }
 .customer-table .ct-idx { text-align: center; color: var(--text-secondary); font-weight: 600; }
 .customer-table .ct-name { font-weight: 600; color: var(--text-primary); }
+.ct-del-btn {
+  padding: 4px 12px; border: 1px solid #fca5a5; border-radius: 5px;
+  background: #fef2f2; color: #dc2626; font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.ct-del-btn:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
 /* 定位按钮 */
 .loc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .loc-btn {
@@ -354,6 +359,17 @@ body {
     <div class="pw-btns">
       <button class="pw-cancel" onclick="closePwModal()">取消</button>
       <button class="pw-confirm" onclick="confirmPw()">确认</button>
+    </div>
+  </div>
+</div>
+<div class="pw-overlay" id="delOverlay">
+  <div class="pw-dialog">
+    <div class="pw-icon">🗑️</div>
+    <h3>删除客户档案</h3>
+    <div class="pw-desc">确定要删除客户「<span id="delCustomerName" style="color:var(--text-primary);font-weight:600"></span>」的档案吗？<br>删除后无法恢复。</div>
+    <div class="pw-btns">
+      <button class="pw-cancel" onclick="closeDeleteModal()">取消</button>
+      <button class="pw-confirm" id="delConfirmBtn" style="background:#ef4444" onclick="executeDeleteCustomer()">确认删除</button>
     </div>
   </div>
 </div>
@@ -639,14 +655,15 @@ function renderSidebar(filter) {
     var locked = isProtected(catKey) && !unlocked;
     var lockHtml = locked ? '<span class="lock-badge">🔒</span>' : '';
     html += '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="onCatClick(this,\'' + catKey + '\')"><span class="icon">' + cat.icon + '</span><span>' + cat.label + '</span>' + lockHtml + '<span class="count">' + totalCount + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
-    /* 客户档案分类：添加在线填报入口和现有客户档案表格入口 */
+    /* 客户档案分类：侧边栏只保留"现有客户档案"表格入口 */
     if (catKey.indexOf('05-客户档案') === 0 && !locked) {
-      html += '<div class="file-item" onclick="showCustomerForm()"><span class="dot" style="background:#f59e0b"></span><span>📝 在线填报新客户</span><span class="ext-badge form">填报</span></div>';
       var custCount = (cat._customerRecords || []).length;
       html += '<div class="file-item" onclick="showCustomerTable()"><span class="dot" style="background:#10b981"></span><span>📋 现有客户档案</span><span class="ext-badge form">' + custCount + '</span></div>';
     }
     for (var fi = 0; fi < files.length; fi++) {
       var f = files[fi];
+      /* 客户档案分类：侧边栏隐藏客户信息模板（分类页面仍可打开） */
+      if (catKey.indexOf('05-客户档案') === 0 && f.name && f.name.indexOf('客户信息模板') >= 0) continue;
       var active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && !currentFile.subfolder;
       html += '<div class="file-item' + (active ? ' active' : '') + '" onclick="openFile(\'' + f.category + '\',\'' + f.filename + '\',\'\')"><span class="dot"></span><span>' + f.name + '</span><span class="ext-badge ' + f.ext + '">' + f.ext + '</span></div>';
     }
@@ -856,8 +873,18 @@ function getLocation() {
     var lat = pos.coords.latitude.toFixed(6);
     var lng = pos.coords.longitude.toFixed(6);
     if (coordEl) coordEl.value = lat + ',' + lng;
-    if (statusEl) statusEl.textContent = '✅ 已获取：' + lat + ', ' + lng;
-    showToast('位置获取成功');
+    if (statusEl) statusEl.textContent = '✅ 已获取坐标，正在解析地址...';
+    /* 逆地理编码，自动填写省市区县 */
+    reverseGeocode(lat, lng).then(function(info) {
+      var regionEl = document.getElementById('field_marketRegion');
+      var addrEl = document.getElementById('field_address');
+      if (regionEl && info.marketRegion) regionEl.value = info.marketRegion;
+      if (addrEl && info.fullAddress) addrEl.value = info.fullAddress;
+      if (statusEl) statusEl.textContent = '✅ 已自动填写位置信息，可手动修改';
+      showToast('位置信息已自动填写');
+    }).catch(function() {
+      if (statusEl) statusEl.textContent = '✅ 已获取坐标（地址解析失败，省市区县需手动填写）';
+    });
   }, function(err) {
     var msg = '定位失败';
     if (err.code === 1) msg = '定位失败：您拒绝了位置权限，请在浏览器设置中允许后重试';
@@ -866,6 +893,37 @@ function getLocation() {
     if (statusEl) statusEl.textContent = msg;
     showToast(msg);
   }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+
+/* 逆地理编码：坐标 → 省市区县（OpenStreetMap 免费接口） */
+function reverseGeocode(lat, lng) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&accept-language=zh', true);
+    xhr.timeout = 8000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var addr = data.address || {};
+          var province = addr.state || addr.province || '';
+          var city = addr.city || addr.prefecture || addr.state_district || '';
+          var county = addr.county || addr.district || addr.city_district || '';
+          var town = addr.town || addr.village || addr.suburb || addr.neighbourhood || '';
+          var shortProv = province.replace(/省|市|壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区/g, '');
+          var shortCity = city.replace(/市/g, '');
+          var marketRegion = shortProv ? (shortCity ? shortProv + '/' + shortCity : shortProv) : shortCity;
+          var fullAddress = province + city + county + town;
+          resolve({ marketRegion: marketRegion, fullAddress: fullAddress });
+        } catch(e) { reject(e); }
+      } else {
+        reject(new Error('地址解析失败'));
+      }
+    };
+    xhr.onerror = function() { reject(new Error('网络错误')); };
+    xhr.ontimeout = function() { reject(new Error('超时')); };
+    xhr.send();
+  });
 }
 
 function resetCustomerForm() {
@@ -948,10 +1006,10 @@ function showCustomerTable() {
   if (records.length === 0) {
     html += '<div style="text-align:center;padding:60px 20px;color:var(--text-secondary)"><div style="font-size:48px;margin-bottom:16px">📭</div><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
   } else {
-    html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th></tr></thead><tbody>';
+    html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
     for (var i = 0; i < records.length; i++) {
       var rec = records[i];
-      html += '<tr onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td></tr>';
+      html += '<tr onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td><td><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
     }
     html += '</tbody></table></div>';
   }
@@ -969,6 +1027,59 @@ function showCustomerDetail(index) {
   document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">返回列表</button>';
   document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + marked.parse(generateCustomerMd(rec)) + '</div>';
   document.getElementById('contentWrap').scrollTop = 0;
+}
+
+/* ===== 删除客户档案 ===== */
+var pendingDeleteIndex = -1;
+
+function confirmDeleteCustomer(index, event) {
+  if (event) { event.stopPropagation(); }
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  var rec = records[index];
+  if (!rec) return;
+  pendingDeleteIndex = index;
+  document.getElementById('delCustomerName').textContent = rec.customerName || ('客户 ' + (index + 1));
+  document.getElementById('delOverlay').classList.add('show');
+}
+
+function closeDeleteModal() {
+  pendingDeleteIndex = -1;
+  document.getElementById('delOverlay').classList.remove('show');
+}
+
+async function executeDeleteCustomer() {
+  var index = pendingDeleteIndex;
+  if (index < 0) return;
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  var rec = records[index];
+  var btn = document.getElementById('delConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = '删除中...';
+  try {
+    /* 获取最新 SHA */
+    var sha = await ghGetSha('customers.json');
+    /* 从显示列表（最新在前）中移除，再还原为存储顺序（最旧在前） */
+    var displayRecords = records.slice();
+    displayRecords.splice(index, 1);
+    var newRecords = displayRecords.slice().reverse();
+    var newData = { records: newRecords };
+    /* 推送到 GitHub */
+    await ghPutFile('customers.json', JSON.stringify(newData, null, 2), sha);
+    /* 更新本地数据 */
+    customersData = newData;
+    mergeCustomers();
+    renderSidebar();
+    closeDeleteModal();
+    showToast('已删除客户「' + (rec.customerName || '') + '」');
+    showCustomerTable();
+  } catch (e) {
+    showToast('删除失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '确认删除';
+  }
 }
 
 /* ===== GitHub API 操作 ===== */
@@ -1192,10 +1303,10 @@ function showCategoryPage(catKey) {
     if (custRecords.length === 0) {
       html += '<div style="text-align:center;padding:40px 20px;color:var(--text-secondary);background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--radius)"><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
     } else {
-      html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th></tr></thead><tbody>';
+      html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
       for (var ci = 0; ci < custRecords.length; ci++) {
         var crec = custRecords[ci];
-        html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td></tr>';
+        html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
       }
       html += '</tbody></table></div>';
     }
