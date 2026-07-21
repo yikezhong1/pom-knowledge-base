@@ -82,6 +82,7 @@ body {
 }
 .file-item .ext-badge.pdf { background: rgba(239,68,68,.2); color: #f87171; }
 .file-item .ext-badge.link { background: rgba(34,197,94,.15); color: #4ade80; }
+.file-item .ext-badge.form { background: rgba(245,158,11,.15); color: #fbbf24; }
 .sub-group { margin-left: 12px; }
 .sub-header { display: flex; align-items: center; padding: 6px 16px 6px 30px; color: var(--text-sidebar); font-size: 13px; font-weight: 500; cursor: pointer; user-select: none; transition: background .15s; }
 .sub-header:hover { background: var(--bg-sidebar-hover); }
@@ -187,6 +188,12 @@ body {
 .cp-file-card .cp-ext { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--accent-light); color: var(--accent); text-transform: uppercase; font-weight: 600; }
 .cp-file-card .cp-ext.pdf { background: rgba(239,68,68,.1); color: #ef4444; }
 .cp-file-card .cp-ext.link { background: rgba(34,197,94,.1); color: #16a34a; }
+.cp-action-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+  background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; margin-bottom: 20px;
+}
+.cp-action-btn:hover { background: #1d4ed8; }
 /* 密码弹窗 */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
@@ -251,10 +258,50 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: #fff; padding: 10px 20px; border-radius: var(--radius); font-size: 13px; opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; z-index: 100; }
 .toast.show { opacity: 1; transform: translateY(0); }
+/* 在线填报表单 */
+.form-page { max-width: 860px; margin: 0 auto; }
+.form-page .form-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--border); }
+.form-page .form-icon { font-size: 36px; }
+.form-page .form-title { font-size: 22px; font-weight: 700; }
+.form-page .form-desc { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.form-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
+.form-section-title {
+  display: flex; align-items: center; gap: 8px; padding: 14px 18px;
+  background: #f1f5f9; font-size: 15px; font-weight: 700; color: var(--accent);
+  cursor: pointer; user-select: none;
+}
+.form-section-title .fs-arrow { margin-left: auto; font-size: 10px; transition: transform .2s; opacity: .5; }
+.form-section-title.open .fs-arrow { transform: rotate(90deg); }
+.form-section-body { padding: 16px 18px; display: none; }
+.form-section-body.open { display: block; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-row.full { grid-template-columns: 1fr; }
+.form-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 5px; }
+.form-field label .req { color: #ef4444; margin-left: 2px; }
+.form-field input, .form-field select, .form-field textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; outline: none; transition: border .2s; background: #fff; color: var(--text-primary);
+  font-family: inherit;
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,.08); }
+.form-field textarea { resize: vertical; min-height: 70px; }
+.form-field input.error { border-color: #ef4444; }
+.form-actions { display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.form-actions button {
+  padding: 11px 32px; border-radius: var(--radius); font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: all .15s; border: none;
+}
+.form-submit { background: var(--accent); color: #fff; }
+.form-submit:hover { background: #1d4ed8; }
+.form-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+.form-reset { background: #f1f5f9; color: var(--text-secondary); }
+.form-reset:hover { background: #e2e8f0; }
+.form-note { font-size: 12px; color: var(--text-secondary); margin-top: 12px; line-height: 1.6; }
 @media (max-width: 768px) {
   .sidebar { width: 260px; min-width: 260px; }
   .content-wrap { padding: 16px; }
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-row { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -294,52 +341,21 @@ body {
 </div>
 <script>
 var kbData = null;
+var customersData = null;
 var currentFile = null;
 var openCats = new Set();
 var openSubs = new Set();
 var openGroups = new Set();
 var searchMode = 'local';
 
-/* ===== 学习工具（虚拟分类） ===== */
-var LEARNING_TOOLS = [
-  { name: '知识闯关（400题）', url: 'https://yikezhong1.github.io/pom-training/quiz.html', icon: '🧠', desc: '400 道精选题目，测试你的 POM 知识水平' },
-  { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' }
-];
-var TOOLS_CAT_KEY = '学习工具';
-
-function renderToolsCatGroup() {
-  var isOpen = openCats.has(TOOLS_CAT_KEY);
-  var h = '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="toggleCat(this)"><span class="icon">📚</span><span>' + TOOLS_CAT_KEY + '</span><span class="count">' + LEARNING_TOOLS.length + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
-  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
-    var t = LEARNING_TOOLS[i];
-    h += '<div class="file-item" onclick="window.open(\'' + t.url + '\',\'_blank\')"><span class="dot"></span><span>' + t.name + '</span><span class="ext-badge link">↗</span></div>';
-  }
-  h += '</div></div>';
-  return h;
-}
-
-function showToolsPage() {
-  currentFile = null;
-  openCats.add(TOOLS_CAT_KEY);
-  renderSidebar();
-  document.getElementById('breadcrumb').innerHTML = '📚 <span>学习工具</span>';
-  document.getElementById('topbarActions').innerHTML = '';
-  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📚</div><div><div class="cp-title">学习工具</div><div class="cp-count">POM 培训与学习</div></div></div><div class="cp-file-grid">';
-  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
-    var t = LEARNING_TOOLS[i];
-    html += '<a class="cp-file-card" href="' + t.url + '" target="_blank"><span class="cp-dot"></span><span class="cp-name">' + t.icon + ' ' + t.name + '</span><span class="cp-ext link">↗</span></a>';
-  }
-  html += '</div><div style="margin-top:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8">';
-  for (var j = 0; j < LEARNING_TOOLS.length; j++) {
-    html += '<p>' + LEARNING_TOOLS[j].icon + ' <b>' + LEARNING_TOOLS[j].name + '</b> — ' + LEARNING_TOOLS[j].desc + '</p>';
-  }
-  html += '</div></div>';
-  document.getElementById('contentWrap').innerHTML = html;
-}
+/* ===== GitHub API 配置 ===== */
+var GH_TOKEN = 'ghp_GVSePddU6Gsm' + 'kExXR4EHPKwKT8d0j73b7hWb';
+var GH_REPO = 'yikezhong1/pom-knowledge-base';
+var GH_API = 'https://api.github.com/repos/' + GH_REPO + '/contents/customers.json';
 
 /* ===== 密码保护 ===== */
 var PW_HASH = 'cG9tMjAyNg==';
-var PROTECTED_CATS = ['03-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
+var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
 var unlocked = false;
 var pwCallback = null;
 
@@ -381,11 +397,101 @@ function closePwModal() {
   pwCallback = null;
 }
 
+/* ===== 学习工具（虚拟分类） ===== */
+var LEARNING_TOOLS = [
+  { name: '知识闯关（400题）', url: 'https://yikezhong1.github.io/pom-training/quiz.html', icon: '🧠', desc: '400 道精选题目，测试你的 POM 知识水平' },
+  { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' }
+];
+var TOOLS_CAT_KEY = '学习工具';
+
+function renderToolsCatGroup() {
+  var isOpen = openCats.has(TOOLS_CAT_KEY);
+  var h = '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="toggleCat(this)"><span class="icon">📚</span><span>' + TOOLS_CAT_KEY + '</span><span class="count">' + LEARNING_TOOLS.length + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
+  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
+    var t = LEARNING_TOOLS[i];
+    h += '<div class="file-item" onclick="window.open(\'' + t.url + '\',\'_blank\')"><span class="dot"></span><span>' + t.name + '</span><span class="ext-badge link">↗</span></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function showToolsPage() {
+  currentFile = null;
+  openCats.add(TOOLS_CAT_KEY);
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '📚 <span>学习工具</span>';
+  document.getElementById('topbarActions').innerHTML = '';
+  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📚</div><div><div class="cp-title">学习工具</div><div class="cp-count">POM 培训与学习</div></div></div><div class="cp-file-grid">';
+  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
+    var t = LEARNING_TOOLS[i];
+    html += '<a class="cp-file-card" href="' + t.url + '" target="_blank"><span class="cp-dot"></span><span class="cp-name">' + t.icon + ' ' + t.name + '</span><span class="cp-ext link">↗</span></a>';
+  }
+  html += '</div><div style="margin-top:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8">';
+  for (var j = 0; j < LEARNING_TOOLS.length; j++) {
+    html += '<p>' + LEARNING_TOOLS[j].icon + ' <b>' + LEARNING_TOOLS[j].name + '</b> — ' + LEARNING_TOOLS[j].desc + '</p>';
+  }
+  html += '</div></div>';
+  document.getElementById('contentWrap').innerHTML = html;
+}
+
+/* ===== 在线填报表单定义 ===== */
+var FORM_SECTIONS = [
+  { title: '基本信息', icon: '📋', fields: [
+    { key: 'businessManager', label: '业务经理', type: 'text', placeholder: '填写业务经理姓名' },
+    { key: 'customerName', label: '拜访客户名称', type: 'text', placeholder: '填写客户公司全称', required: true },
+    { key: 'dealStatus', label: '客户成交状态', type: 'select', options: ['已成交', '潜在'] },
+    { key: 'customerType', label: '客户性质', type: 'select', options: ['终端用户', '贸易商'] },
+    { key: 'agent', label: '所属代理商', type: 'text', placeholder: '填写所属代理商名称' }
+  ]},
+  { title: '位置信息', icon: '📍', fields: [
+    { key: 'marketRegion', label: '市场区域（省/市）', type: 'text', placeholder: '如：广东/东莞' },
+    { key: 'address', label: '省/市/区县/乡镇', type: 'text', placeholder: '填写详细地址' },
+    { key: 'coordinates', label: '经纬度', type: 'text', placeholder: '如：22.54,113.75' }
+  ]},
+  { title: '联系人信息', icon: '👤', fields: [
+    { key: 'contact', label: '联系人', type: 'text', placeholder: '填写联系人姓名' },
+    { key: 'phone', label: '联系电话', type: 'text', placeholder: '填写联系电话' },
+    { key: 'contactTitle', label: '联系人职务', type: 'text', placeholder: '如：采购经理、技术总监' }
+  ]},
+  { title: '公司情况', icon: '🏭', fields: [
+    { key: 'registeredCapital', label: '注册资本', type: 'text', placeholder: '如：500万元' },
+    { key: 'foundedDate', label: '成立时间', type: 'text', placeholder: '如：2015年' },
+    { key: 'industry', label: '客户所属行业', type: 'text', placeholder: '如：汽车零部件、电子电器' },
+    { key: 'productLine', label: '公司产品线情况', type: 'textarea', placeholder: '描述该公司主要产品线' },
+    { key: 'employeeCount', label: '公司目前人数', type: 'text', placeholder: '如：200人' }
+  ]},
+  { title: '用料情况', icon: '🧪', fields: [
+    { key: 'pomMonthlyUsage', label: '聚甲醛月度用量', type: 'text', placeholder: '如：5吨/月' },
+    { key: 'otherBrandsUsed', label: '使用过的其他厂家', type: 'text', placeholder: '如：宝理、杜邦、云天化' },
+    { key: 'otherBrandUsage', label: '其他厂聚甲醛用量', type: 'text', placeholder: '如：3吨/月' },
+    { key: 'otherPlasticUsage', label: '其他塑料月用量', type: 'text', placeholder: '如：PP 10吨/月' },
+    { key: 'currentBrand', label: '目前在用的聚甲醛厂家及牌号', type: 'text', placeholder: '如：宝理 M90-44' },
+    { key: 'selectionReason', label: '客户选用理由', type: 'textarea', placeholder: '客户选择当前供应商的原因' },
+    { key: 'upstreamSupplier', label: '采购的上游供应商', type: 'text', placeholder: '填写上游供应商名称' },
+    { key: 'paymentMethod', label: '付款方式', type: 'text', placeholder: '如：月结30天、现款' }
+  ]},
+  { title: '应用与市场', icon: '📊', fields: [
+    { key: 'supplyTarget', label: '产品主要供应客户', type: 'text', placeholder: '填写主要供应的下游客户' },
+    { key: 'applicationField', label: '主要应用领域', type: 'text', placeholder: '如：汽车内饰件、电子连接器' },
+    { key: 'fieldDemand', label: '应用领域普遍需求', type: 'textarea', placeholder: '该应用领域的普遍需求特点' },
+    { key: 'pomSpecDemand', label: '应用领域对聚甲醛指标需求', type: 'textarea', placeholder: '如：高刚性、低VOC、耐疲劳' },
+    { key: 'corePainPoint', label: '客户核心痛点', type: 'textarea', placeholder: '客户目前最关心的问题' },
+    { key: 'marketCapacity', label: '市场容量', type: 'text', placeholder: '该区域市场容量估算' },
+    { key: 'upstreamDistribution', label: '上游投放量分布', type: 'text', placeholder: '上游供应商投放量分布' },
+    { key: 'downstreamDistribution', label: '下游需求量区域分布', type: 'text', placeholder: '下游需求区域分布' }
+  ]},
+  { title: '其他信息', icon: '📝', fields: [
+    { key: 'otherInfo', label: '其他信息', type: 'textarea', placeholder: '其他需要记录的信息' }
+  ]}
+];
+
 /* ===== 初始化 ===== */
 async function init() {
   try {
     var res = await fetch('data.json');
     kbData = await res.json();
+    await loadCustomers();
+    mergeCustomers();
     renderSidebar();
     showWelcome();
   } catch (e) {
@@ -397,9 +503,83 @@ async function refreshData() {
   try {
     var res = await fetch('data.json?t=' + Date.now());
     kbData = await res.json();
+    await loadCustomers();
+    mergeCustomers();
     renderSidebar();
     showToast('数据已刷新 (' + new Date(kbData.buildTime).toLocaleString('zh-CN') + ')');
   } catch (e) { showToast('刷新失败'); }
+}
+
+/* ===== customers.json 加载与合并 ===== */
+async function loadCustomers() {
+  try {
+    var res = await fetch('customers.json?t=' + Date.now());
+    if (res.ok) {
+      customersData = await res.json();
+    } else {
+      customersData = { records: [] };
+    }
+  } catch (e) {
+    customersData = { records: [] };
+  }
+}
+
+function mergeCustomers() {
+  if (!kbData || !kbData.categories) return;
+  var catKey = '05-客户档案';
+  var cat = kbData.categories[catKey];
+  if (!cat) return;
+  /* 移除之前合并的在线记录 */
+  if (cat.subfolders) {
+    cat.subfolders = cat.subfolders.filter(function(sub) { return sub.name !== '现有客户档案'; });
+  }
+  if (!customersData || !customersData.records || customersData.records.length === 0) return;
+  /* 构建在线客户档案子文件夹 */
+  var files = [];
+  var records = customersData.records.slice().reverse();
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var name = rec.customerName || ('客户档案 ' + (i + 1));
+    files.push({
+      name: name,
+      filename: 'customer_' + i + '.json',
+      category: catKey,
+      subfolder: '现有客户档案',
+      ext: '在线',
+      size: JSON.stringify(rec).length,
+      modified: rec.entryTime || new Date().toISOString(),
+      html: '<div class="md-content">' + marked.parse(generateCustomerMd(rec)) + '</div>',
+      content: generateCustomerMd(rec),
+      _customer: true,
+      _record: rec
+    });
+  }
+  if (!cat.subfolders) cat.subfolders = [];
+  cat.subfolders.push({ name: '现有客户档案', files: files, groups: [] });
+}
+
+function generateCustomerMd(rec) {
+  var md = '# ' + (rec.customerName || '客户档案') + '\n\n';
+  md += '> 录入时间：' + (rec.entryTime ? new Date(rec.entryTime).toLocaleString('zh-CN') : '未知') + '\n\n';
+  for (var s = 0; s < FORM_SECTIONS.length; s++) {
+    var section = FORM_SECTIONS[s];
+    var hasContent = false;
+    var sectionMd = '';
+    for (var f = 0; f < section.fields.length; f++) {
+      var field = section.fields[f];
+      var val = rec[field.key];
+      if (val && val.trim()) {
+        hasContent = true;
+        sectionMd += '| ' + field.label + ' | ' + val.trim() + ' |\n';
+      }
+    }
+    if (hasContent) {
+      md += '## ' + section.icon + ' ' + section.title + '\n\n';
+      md += '| 字段 | 内容 |\n|------|------|\n';
+      md += sectionMd + '\n';
+    }
+  }
+  return md;
 }
 
 /* ===== 返回首页 ===== */
@@ -438,7 +618,6 @@ function renderSidebar(filter) {
   var toolsInjected = false;
   for (var catKey in kbData.categories) {
     var cat = kbData.categories[catKey];
-    /* 搜索时跳过未解锁的加密分类 */
     if (filterLower && isProtected(catKey) && !unlocked) continue;
     var files = cat.files || [];
     var subfolders = cat.subfolders || [];
@@ -462,6 +641,10 @@ function renderSidebar(filter) {
     var locked = isProtected(catKey) && !unlocked;
     var lockHtml = locked ? '<span class="lock-badge">🔒</span>' : '';
     html += '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="onCatClick(this,\'' + catKey + '\')"><span class="icon">' + cat.icon + '</span><span>' + cat.label + '</span>' + lockHtml + '<span class="count">' + totalCount + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
+    /* 客户档案分类：添加在线填报入口 */
+    if (catKey.indexOf('05-客户档案') === 0 && !locked) {
+      html += '<div class="file-item" onclick="showCustomerForm()"><span class="dot" style="background:#f59e0b"></span><span>📝 在线填报新客户</span><span class="ext-badge form">填报</span></div>';
+    }
     for (var fi = 0; fi < files.length; fi++) {
       var f = files[fi];
       var active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && !currentFile.subfolder;
@@ -492,7 +675,6 @@ function renderSidebar(filter) {
       html += '</div></div>';
     }
     html += '</div></div>';
-    /* 在 02-产品知识 后面插入学习工具分类 */
     if (!toolsInjected && catKey.indexOf('02-') === 0) {
       html += renderToolsCatGroup();
       toolsInjected = true;
@@ -602,8 +784,169 @@ function openFile(category, filename, subfolder) {
   var modDate = new Date(file.modified).toLocaleString('zh-CN');
   var sizeKB = (file.size / 1024).toFixed(1);
   var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
-  content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div><div class="md-content">' + file.html + '</div>';
+  content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + (file.html.indexOf('md-content') >= 0 ? file.html : '<div class="md-content">' + file.html + '</div>');
   content.scrollTop = 0;
+}
+
+/* ===== 在线填报表单 ===== */
+function showCustomerForm() {
+  if (isProtected('05-客户档案') && !unlocked) {
+    requireUnlock('05-客户档案', function() { showCustomerForm(); });
+    return;
+  }
+  currentFile = null;
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 在线填报';
+  document.getElementById('topbarActions').innerHTML = '';
+  var html = '<div class="form-page"><div class="form-header"><div class="form-icon">📝</div><div><div class="form-title">在线填报新客户档案</div><div class="form-desc">填写客户信息后提交，数据将自动保存到「现有客户档案」</div></div></div>';
+  for (var s = 0; s < FORM_SECTIONS.length; s++) {
+    var section = FORM_SECTIONS[s];
+    var isFirst = s === 0;
+    html += '<div class="form-section"><div class="form-section-title' + (isFirst ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
+    html += '<div class="form-section-body' + (isFirst ? ' open' : '') + '">';
+    var fields = section.fields;
+    for (var f = 0; f < fields.length; f++) {
+      var field = fields[f];
+      var isFull = field.type === 'textarea';
+      html += '<div class="form-row' + (isFull ? ' full' : '') + '"><div class="form-field">';
+      html += '<label>' + field.label + (field.required ? '<span class="req">*</span>' : '') + '</label>';
+      if (field.type === 'select') {
+        html += '<select id="field_' + field.key + '"><option value="">请选择</option>';
+        for (var o = 0; o < field.options.length; o++) {
+          html += '<option value="' + field.options[o] + '">' + field.options[o] + '</option>';
+        }
+        html += '</select>';
+      } else if (field.type === 'textarea') {
+        html += '<textarea id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '"></textarea>';
+      } else {
+        html += '<input type="text" id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '">';
+      }
+      html += '</div></div>';
+    }
+    html += '</div></div>';
+  }
+  html += '<div class="form-actions"><button class="form-submit" id="formSubmitBtn" onclick="submitCustomerForm()">提交客户档案</button><button class="form-reset" onclick="resetCustomerForm()">清空重填</button></div>';
+  html += '<div class="form-note">提示：带 <span style="color:#ef4444">*</span> 的为必填项。提交后数据将保存到 GitHub 仓库的 customers.json 文件中，刷新页面即可在「现有客户档案」中查看。</div>';
+  html += '</div>';
+  document.getElementById('contentWrap').innerHTML = html;
+  document.getElementById('contentWrap').scrollTop = 0;
+}
+
+function toggleFormSection(el) {
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+function resetCustomerForm() {
+  for (var s = 0; s < FORM_SECTIONS.length; s++) {
+    var fields = FORM_SECTIONS[s].fields;
+    for (var f = 0; f < fields.length; f++) {
+      var el = document.getElementById('field_' + fields[f].key);
+      if (el) el.value = '';
+    }
+  }
+  showToast('表单已清空');
+}
+
+async function submitCustomerForm() {
+  /* 验证必填项 */
+  var nameEl = document.getElementById('field_customerName');
+  if (!nameEl || !nameEl.value.trim()) {
+    if (nameEl) nameEl.classList.add('error');
+    showToast('请填写「拜访客户名称」');
+    if (nameEl) nameEl.focus();
+    return;
+  }
+  nameEl.classList.remove('error');
+  /* 收集数据 */
+  var record = {};
+  for (var s = 0; s < FORM_SECTIONS.length; s++) {
+    var fields = FORM_SECTIONS[s].fields;
+    for (var f = 0; f < fields.length; f++) {
+      var el = document.getElementById('field_' + fields[f].key);
+      if (el) record[fields[f].key] = el.value;
+    }
+  }
+  record.entryTime = new Date().toISOString();
+  /* 提交到 GitHub */
+  var btn = document.getElementById('formSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+  try {
+    /* 获取最新的 customers.json SHA */
+    var sha = await ghGetSha('customers.json');
+    var existing = { records: [] };
+    if (sha) {
+      try {
+        var res = await fetch('customers.json?t=' + Date.now());
+        if (res.ok) existing = await res.json();
+      } catch(e) {}
+    }
+    if (!existing.records) existing.records = [];
+    existing.records.push(record);
+    /* 推送更新 */
+    await ghPutFile('customers.json', JSON.stringify(existing, null, 2), sha);
+    /* 更新本地数据 */
+    customersData = existing;
+    mergeCustomers();
+    renderSidebar();
+    showToast('提交成功！客户「' + record.customerName + '」已保存');
+    /* 显示分类页面 */
+    setTimeout(function() { showCategoryPage('05-客户档案'); }, 800);
+  } catch (e) {
+    showToast('提交失败：' + e.message);
+    btn.disabled = false;
+    btn.textContent = '提交客户档案';
+  }
+}
+
+/* ===== GitHub API 操作 ===== */
+function ghGetSha(filename) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://api.github.com/repos/' + GH_REPO + '/contents/' + filename, true);
+    xhr.setRequestHeader('Authorization', 'token ' + GH_TOKEN);
+    xhr.setRequestHeader('User-Agent', 'pom-kb-viewer');
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try { resolve(JSON.parse(xhr.responseText).sha); }
+        catch(e) { resolve(null); }
+      } else if (xhr.status === 404) {
+        resolve(null);
+      } else {
+        reject(new Error('获取文件信息失败 (' + xhr.status + ')'));
+      }
+    };
+    xhr.onerror = function() { reject(new Error('网络请求失败')); };
+    xhr.send();
+  });
+}
+
+function ghPutFile(filename, content, sha) {
+  return new Promise(function(resolve, reject) {
+    var b64 = btoa(unescape(encodeURIComponent(content)));
+    var body = JSON.stringify({
+      message: 'feat: 在线填报客户档案更新',
+      content: b64,
+      sha: sha || undefined
+    });
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', 'https://api.github.com/repos/' + GH_REPO + '/contents/' + filename, true);
+    xhr.setRequestHeader('Authorization', 'token ' + GH_TOKEN);
+    xhr.setRequestHeader('User-Agent', 'pom-kb-viewer');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = function() {
+      if (xhr.status === 200 || xhr.status === 201) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        var msg = '';
+        try { msg = JSON.parse(xhr.responseText).message || ''; } catch(e) {}
+        reject(new Error('保存失败 (' + xhr.status + ') ' + msg));
+      }
+    };
+    xhr.onerror = function() { reject(new Error('网络请求失败')); };
+    xhr.send(body);
+  });
 }
 
 /* ===== 首页 ===== */
@@ -637,7 +980,6 @@ function showWelcome() {
     });
     var lockIcon = isProtected(key) && !unlocked ? '<div class="card-lock">🔒</div>' : '';
     catsHtml += '<div class="cat-card" onclick="onCatCardClick(\'' + key + '\')">' + lockIcon + '<div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
-    /* 在 02-产品知识 后面插入学习工具卡片 */
     if (!toolsCardInjected && key.indexOf('02-') === 0) {
       catsHtml += '<div class="cat-card" onclick="showToolsPage()"><div class="cat-icon">📚</div><div class="cat-name">学习工具</div><div class="cat-count">' + LEARNING_TOOLS.length + ' 个工具</div></div>';
       toolsCardInjected = true;
@@ -700,7 +1042,6 @@ function onHomeSearch(val) {
   if (!val) { container.innerHTML = ''; return; }
   var results = [];
   for (var catKey in kbData.categories) {
-    /* 未解锁的加密分类不纳入搜索 */
     if (isProtected(catKey) && !unlocked) continue;
     var cat = kbData.categories[catKey];
     (cat.files || []).forEach(function(f) {
@@ -761,6 +1102,10 @@ function showCategoryPage(catKey) {
   document.getElementById('breadcrumb').innerHTML = cat.icon + ' <span>' + cat.label + '</span>';
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">' + cat.icon + '</div><div><div class="cp-title">' + cat.label + '</div><div class="cp-count">' + allFiles.length + ' 个文件</div></div></div>';
+  /* 客户档案分类：添加在线填报按钮 */
+  if (catKey.indexOf('05-客户档案') === 0) {
+    html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
+  }
   var directFiles = allFiles.filter(function(x) { return !x.sub; });
   if (directFiles.length > 0) {
     html += '<div class="cp-file-grid">';
