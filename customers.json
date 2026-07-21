@@ -1,3 +1,40 @@
 {
-  "records": []
+  "records": [
+    {
+      "businessManager": "111",
+      "customerName": "111",
+      "dealStatus": "潜在",
+      "customerType": "终端用户",
+      "agent": "2222",
+      "marketRegion": "11",
+      "address": "11",
+      "coordinates": "11111",
+      "contact": "111",
+      "phone": "11",
+      "contactTitle": "1111",
+      "registeredCapital": "11",
+      "foundedDate": "111",
+      "industry": "111",
+      "productLine": "111",
+      "employeeCount": "",
+      "pomMonthlyUsage": "111",
+      "otherBrandsUsed": "111",
+      "otherBrandUsage": "111",
+      "otherPlasticUsage": "11",
+      "currentBrand": "111",
+      "selectionReason": "111",
+      "upstreamSupplier": "111",
+      "paymentMethod": "111",
+      "supplyTarget": "111",
+      "applicationField": "111",
+      "fieldDemand": "111",
+      "pomSpecDemand": "111",
+      "corePainPoint": "111",
+      "marketCapacity": "111",
+      "upstreamDistribution": "111",
+      "downstreamDistribution": "111",
+      "otherInfo": "2222",
+      "entryTime": "2026-07-21T15:08:16.201Z"
+    }
+  ]
 }
