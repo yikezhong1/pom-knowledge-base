@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POM 聚甲醛知识库</title>
 <script src="marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -222,6 +224,10 @@ body {
 }
 .loc-btn:hover { background: #059669; }
 .loc-status { font-size: 12px; color: var(--text-secondary); }
+.loc-map-wrap { width: 100%; height: 300px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 14px; overflow: hidden; position: relative; z-index: 1; }
+.loc-map-tip { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; padding: 6px 10px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; }
+.loc-btn-blue { background: #2563eb; }
+.loc-btn-blue:hover { background: #1d4ed8; }
 /* 密码弹窗 */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
@@ -824,12 +830,14 @@ function showCustomerForm() {
   var html = '<div class="form-page"><div class="form-header"><div class="form-icon">📝</div><div><div class="form-title">在线填报新客户档案</div><div class="form-desc">填写客户信息后提交，数据将自动保存到「现有客户档案」</div></div></div>';
   for (var s = 0; s < FORM_SECTIONS.length; s++) {
     var section = FORM_SECTIONS[s];
-    var isFirst = s === 0;
-    html += '<div class="form-section"><div class="form-section-title' + (isFirst ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
-    html += '<div class="form-section-body' + (isFirst ? ' open' : '') + '">';
-    /* 位置信息板块：添加手机定位按钮 */
+    var isOpen = s === 0 || section.title === '位置信息';
+    html += '<div class="form-section"><div class="form-section-title' + (isOpen ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
+    html += '<div class="form-section-body' + (isOpen ? ' open' : '') + '">';
+    /* 位置信息板块：地图选点+定位按钮 */
     if (section.title === '位置信息') {
-      html += '<div class="loc-row"><button type="button" class="loc-btn" onclick="getLocation()">📍 获取当前位置</button><span class="loc-status" id="locStatus">点击自动读取手机定位，填入经纬度</span></div>';
+      html += '<div class="loc-row"><button type="button" class="loc-btn" onclick="getLocation()">📍 获取当前位置</button><button type="button" class="loc-btn loc-btn-blue" onclick="goToCurrentLocation()">🔄 回到我的位置</button><span class="loc-status" id="locStatus">点击地图选择位置，或点击按钮自动定位</span></div>';
+      html += '<div class="loc-map-tip">💡 点击地图任意位置选择客户所在地，拖动标记可微调，选择后自动填写省市区信息</div>';
+      html += '<div class="loc-map-wrap" id="locationMap"></div>';
     }
     var fields = section.fields;
     for (var f = 0; f < fields.length; f++) {
@@ -857,8 +865,8 @@ function showCustomerForm() {
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
-  /* 自动获取手机位置（需用户授权） */
-  setTimeout(function() { getLocation(); }, 300);
+  /* 初始化地图并自动获取手机位置（需用户授权） */
+  setTimeout(function() { initLocationMap(35.86, 104.19, 4); getLocation(); }, 300);
 }
 
 function toggleFormSection(el) {
@@ -880,6 +888,9 @@ function getLocation() {
     var lng = pos.coords.longitude.toFixed(6);
     if (coordEl) coordEl.value = lat + ',' + lng;
     if (statusEl) statusEl.textContent = '✅ 已获取坐标，正在解析地址...';
+    /* 联动地图：移动中心和标记 */
+    if (locationMap) { locationMap.setView([parseFloat(lat), parseFloat(lng)], 15); }
+    if (locationMarker) { locationMarker.setLatLng([parseFloat(lat), parseFloat(lng)]); }
     /* 逆地理编码，自动填写省市区县 */
     reverseGeocode(lat, lng).then(function(info) {
       var regionEl = document.getElementById('field_marketRegion');
@@ -930,6 +941,82 @@ function reverseGeocode(lat, lng) {
     xhr.ontimeout = function() { reject(new Error('超时')); };
     xhr.send();
   });
+}
+
+/* ===== 地图选点功能 ===== */
+var locationMap = null;
+var locationMarker = null;
+
+function destroyMap() {
+  if (locationMap) {
+    locationMap.remove();
+    locationMap = null;
+    locationMarker = null;
+  }
+}
+
+function initLocationMap(lat, lng, zoom) {
+  destroyMap();
+  var mapEl = document.getElementById('locationMap');
+  if (!mapEl || typeof L === 'undefined') return;
+  locationMap = L.map('locationMap', { center: [lat, lng], zoom: zoom || 13 });
+  L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+    subdomains: '1234',
+    maxZoom: 18,
+    attribution: '&copy; 高德地图'
+  }).addTo(locationMap);
+  locationMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMap);
+  locationMarker.on('dragend', function() {
+    var pos = locationMarker.getLatLng();
+    onMapLocationSelect(pos.lat, pos.lng);
+  });
+  locationMap.on('click', function(e) {
+    locationMarker.setLatLng(e.latlng);
+    onMapLocationSelect(e.latlng.lat, e.latlng.lng);
+  });
+}
+
+function onMapLocationSelect(lat, lng) {
+  var coordEl = document.getElementById('field_coordinates');
+  if (coordEl) coordEl.value = lat.toFixed(6) + ',' + lng.toFixed(6);
+  var statusEl = document.getElementById('locStatus');
+  if (statusEl) statusEl.textContent = '✅ 已选择坐标，正在解析地址...';
+  reverseGeocode(lat.toFixed(6), lng.toFixed(6)).then(function(info) {
+    var regionEl = document.getElementById('field_marketRegion');
+    var addrEl = document.getElementById('field_address');
+    if (regionEl && info.marketRegion) regionEl.value = info.marketRegion;
+    if (addrEl && info.fullAddress) addrEl.value = info.fullAddress;
+    if (statusEl) statusEl.textContent = '✅ 已自动填写位置信息，可手动修改';
+    showToast('位置信息已自动填写');
+  }).catch(function() {
+    if (statusEl) statusEl.textContent = '✅ 已选择坐标（地址解析失败，省市区县需手动填写）';
+  });
+}
+
+function goToCurrentLocation() {
+  var statusEl = document.getElementById('locStatus');
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = '您的浏览器不支持定位功能';
+    return;
+  }
+  if (statusEl) statusEl.textContent = '正在获取当前位置...';
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude;
+    var lng = pos.coords.longitude;
+    if (locationMap) {
+      locationMap.setView([lat, lng], 15);
+      if (locationMarker) locationMarker.setLatLng([lat, lng]);
+    }
+    onMapLocationSelect(lat, lng);
+    showToast('已回到当前位置');
+  }, function(err) {
+    var msg = '定位失败';
+    if (err.code === 1) msg = '定位失败：请允许位置权限后重试';
+    else if (err.code === 2) msg = '定位失败：无法获取位置信息';
+    else if (err.code === 3) msg = '定位失败：获取位置超时';
+    if (statusEl) statusEl.textContent = msg;
+    showToast(msg);
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
 function resetCustomerForm() {
@@ -1001,6 +1088,7 @@ function showCustomerTable() {
     requireUnlock('05-客户档案', function() { showCustomerTable(); });
     return;
   }
+  destroyMap();
   var cat = kbData.categories['05-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   currentFile = null;
@@ -1110,11 +1198,13 @@ function showCustomerEditForm(index) {
   var html = '<div class="form-page"><div class="form-header"><div class="form-icon">✏️</div><div><div class="form-title">编辑客户档案</div><div class="form-desc">修改客户「' + (rec.customerName || '') + '」的信息后保存</div></div></div>';
   for (var s = 0; s < FORM_SECTIONS.length; s++) {
     var section = FORM_SECTIONS[s];
-    var isFirst = s === 0;
-    html += '<div class="form-section"><div class="form-section-title' + (isFirst ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
-    html += '<div class="form-section-body' + (isFirst ? ' open' : '') + '">';
+    var isOpen = s === 0 || section.title === '位置信息';
+    html += '<div class="form-section"><div class="form-section-title' + (isOpen ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
+    html += '<div class="form-section-body' + (isOpen ? ' open' : '') + '">';
     if (section.title === '位置信息') {
-      html += '<div class="loc-row"><button type="button" class="loc-btn" onclick="getLocation()">📍 获取当前位置</button><span class="loc-status" id="locStatus">点击可重新获取手机定位</span></div>';
+      html += '<div class="loc-row"><button type="button" class="loc-btn" onclick="getLocation()">📍 获取当前位置</button><button type="button" class="loc-btn loc-btn-blue" onclick="goToCurrentLocation()">🔄 回到我的位置</button><span class="loc-status" id="locStatus">点击地图选择位置，或点击按钮自动定位</span></div>';
+      html += '<div class="loc-map-tip">💡 点击地图任意位置选择客户所在地，拖动标记可微调，选择后自动填写省市区信息</div>';
+      html += '<div class="loc-map-wrap" id="locationMap"></div>';
     }
     var fields = section.fields;
     for (var f = 0; f < fields.length; f++) {
@@ -1144,6 +1234,14 @@ function showCustomerEditForm(index) {
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
+  /* 初始化地图：如有坐标则定位到客户位置，否则默认中国中心 */
+  var initLat = 35.86, initLng = 104.19, initZoom = 4;
+  if (rec.coordinates && rec.coordinates.indexOf(',') > 0) {
+    var parts = rec.coordinates.split(',');
+    var pLat = parseFloat(parts[0]), pLng = parseFloat(parts[1]);
+    if (!isNaN(pLat) && !isNaN(pLng)) { initLat = pLat; initLng = pLng; initZoom = 14; }
+  }
+  setTimeout(function() { initLocationMap(initLat, initLng, initZoom); }, 300);
 }
 
 async function saveCustomerEdit() {
@@ -1241,6 +1339,7 @@ function ghPutFile(filename, content, sha) {
 /* ===== 首页 ===== */
 function showWelcome() {
   if (!kbData) return;
+  destroyMap();
   currentFile = null;
   renderSidebar();
   var cats = Object.entries(kbData.categories || {});
