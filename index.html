@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POM 聚甲醛知识库</title>
 <script src="marked.min.js"></script>
-<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -401,7 +399,7 @@ var GH_API = 'https://api.github.com/repos/' + GH_REPO + '/contents/customers.js
 /* ===== 密码保护 ===== */
 var PW_HASH = 'cG9tMjAyNg==';
 var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
-var unlocked = false;
+var unlocked = sessionStorage.getItem('pom_kb_unlocked') === '1';
 var pwCallback = null;
 
 function isProtected(catKey) {
@@ -425,6 +423,7 @@ function confirmPw() {
   var val = document.getElementById('pwInput').value;
   if (btoa(val) === PW_HASH) {
     unlocked = true;
+    sessionStorage.setItem('pom_kb_unlocked', '1');
     document.getElementById('pwOverlay').classList.remove('show');
     renderSidebar(document.getElementById('searchInput').value.trim());
     if (pwCallback) { pwCallback(); pwCallback = null; }
@@ -946,6 +945,22 @@ function reverseGeocode(lat, lng) {
 /* ===== 地图选点功能 ===== */
 var locationMap = null;
 var locationMarker = null;
+var leafletLoaded = (typeof L !== 'undefined');
+
+function loadLeaflet(callback) {
+  if (leafletLoaded) { callback(); return; }
+  var mapEl = document.getElementById('locationMap');
+  if (mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:13px">🗺️ 地图加载中...</div>';
+  var css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+  document.head.appendChild(css);
+  var script = document.createElement('script');
+  script.src = 'https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+  script.onload = function() { leafletLoaded = true; callback(); };
+  script.onerror = function() { if (mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:13px">地图加载失败，请检查网络后刷新重试</div>'; };
+  document.head.appendChild(script);
+}
 
 function destroyMap() {
   if (locationMap) {
@@ -957,22 +972,25 @@ function destroyMap() {
 
 function initLocationMap(lat, lng, zoom) {
   destroyMap();
-  var mapEl = document.getElementById('locationMap');
-  if (!mapEl || typeof L === 'undefined') return;
-  locationMap = L.map('locationMap', { center: [lat, lng], zoom: zoom || 13 });
-  L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
-    subdomains: '1234',
-    maxZoom: 18,
-    attribution: '&copy; 高德地图'
-  }).addTo(locationMap);
-  locationMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMap);
-  locationMarker.on('dragend', function() {
-    var pos = locationMarker.getLatLng();
-    onMapLocationSelect(pos.lat, pos.lng);
-  });
-  locationMap.on('click', function(e) {
-    locationMarker.setLatLng(e.latlng);
-    onMapLocationSelect(e.latlng.lat, e.latlng.lng);
+  loadLeaflet(function() {
+    var mapEl = document.getElementById('locationMap');
+    if (!mapEl) return;
+    mapEl.innerHTML = '';
+    locationMap = L.map('locationMap', { center: [lat, lng], zoom: zoom || 13 });
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+      subdomains: '1234',
+      maxZoom: 18,
+      attribution: '&copy; 高德地图'
+    }).addTo(locationMap);
+    locationMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMap);
+    locationMarker.on('dragend', function() {
+      var pos = locationMarker.getLatLng();
+      onMapLocationSelect(pos.lat, pos.lng);
+    });
+    locationMap.on('click', function(e) {
+      locationMarker.setLatLng(e.latlng);
+      onMapLocationSelect(e.latlng.lat, e.latlng.lng);
+    });
   });
 }
 
@@ -1040,6 +1058,30 @@ async function submitCustomerForm() {
     return;
   }
   nameEl.classList.remove('error');
+  /* 验证电话格式（允许手机/座机/空） */
+  var phoneEl = document.getElementById('field_phone');
+  if (phoneEl && phoneEl.value.trim()) {
+    var phoneVal = phoneEl.value.trim();
+    if (!/^[\d\-\+\s()]{5,20}$/.test(phoneVal)) {
+      phoneEl.classList.add('error');
+      showToast('联系电话格式不正确（5-20位数字，可含-+空格）');
+      phoneEl.focus();
+      return;
+    }
+    phoneEl.classList.remove('error');
+  }
+  /* 验证坐标格式（允许空或 lat,lng） */
+  var coordEl = document.getElementById('field_coordinates');
+  if (coordEl && coordEl.value.trim()) {
+    var coordVal = coordEl.value.trim();
+    if (!/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(coordVal)) {
+      coordEl.classList.add('error');
+      showToast('经纬度格式不正确，应为：纬度,经度（如 22.54,113.75）');
+      coordEl.focus();
+      return;
+    }
+    coordEl.classList.remove('error');
+  }
   /* 收集数据 */
   var record = {};
   for (var s = 0; s < FORM_SECTIONS.length; s++) {
@@ -1097,19 +1139,31 @@ function showCustomerTable() {
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📋</div><div><div class="cp-title">现有客户档案</div><div class="cp-count">共 ' + records.length + ' 位客户（点击行查看详情）</div></div></div>';
   html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
+  if (records.length > 0) {
+    html += '<div style="margin-bottom:14px"><input type="text" id="custSearchInput" placeholder="🔍 搜索客户名称 / 业务经理 / 代理商..." oninput="filterCustomerTable(this.value)" style="width:100%;max-width:400px;padding:9px 14px;border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none;transition:border .2s"></div>';
+  }
   if (records.length === 0) {
     html += '<div style="text-align:center;padding:60px 20px;color:var(--text-secondary)"><div style="font-size:48px;margin-bottom:16px">📭</div><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
   } else {
-    html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
+    html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody id="custTableBody">';
     for (var i = 0; i < records.length; i++) {
       var rec = records[i];
-      html += '<tr onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
+      html += '<tr data-idx="' + i + '" data-search="' + ((rec.customerName || '') + (rec.businessManager || '') + (rec.agent || '')).toLowerCase() + '" onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
     }
     html += '</tbody></table></div>';
   }
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
+}
+
+function filterCustomerTable(val) {
+  var keyword = (val || '').trim().toLowerCase();
+  var rows = document.querySelectorAll('#custTableBody tr');
+  for (var i = 0; i < rows.length; i++) {
+    var searchText = rows[i].getAttribute('data-search') || '';
+    rows[i].style.display = (!keyword || searchText.indexOf(keyword) >= 0) ? '' : 'none';
+  }
 }
 
 function showCustomerDetail(index) {
@@ -1260,6 +1314,26 @@ async function saveCustomerEdit() {
     return;
   }
   nameEl.classList.remove('error');
+  /* 验证电话格式 */
+  var phoneEl = document.getElementById('field_phone');
+  if (phoneEl && phoneEl.value.trim()) {
+    if (!/^[\d\-\+\s()]{5,20}$/.test(phoneEl.value.trim())) {
+      phoneEl.classList.add('error');
+      showToast('联系电话格式不正确（5-20位数字，可含-+空格）');
+      phoneEl.focus(); return;
+    }
+    phoneEl.classList.remove('error');
+  }
+  /* 验证坐标格式 */
+  var coordEl = document.getElementById('field_coordinates');
+  if (coordEl && coordEl.value.trim()) {
+    if (!/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(coordEl.value.trim())) {
+      coordEl.classList.add('error');
+      showToast('经纬度格式不正确，应为：纬度,经度（如 22.54,113.75）');
+      coordEl.focus(); return;
+    }
+    coordEl.classList.remove('error');
+  }
   /* 收集数据并更新记录（rec 与 customersData.records 中是同一对象引用） */
   for (var s = 0; s < FORM_SECTIONS.length; s++) {
     var fields = FORM_SECTIONS[s].fields;
@@ -1550,12 +1624,11 @@ function showCategoryPage(catKey) {
 /* ===== 复制 ===== */
 async function copyContent() {
   if (!currentFile) return;
-  var cat = kbData.categories[currentFile.category];
-  var file = findFileInCat(cat, currentFile.filename, currentFile.subfolder);
-  if (file && file.content) {
-    try { await navigator.clipboard.writeText(file.content); showToast('已复制到剪贴板'); }
+  var el = document.querySelector('#contentWrap .md-content');
+  if (el) {
+    try { await navigator.clipboard.writeText(el.innerText); showToast('已复制到剪贴板'); }
     catch(e) { showToast('复制失败'); }
-  }
+  } else { showToast('无可复制内容'); }
 }
 
 function showToast(msg) {
@@ -1566,6 +1639,11 @@ function showToast(msg) {
 }
 
 init();
+
+/* ===== Service Worker 缓存 ===== */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function() {});
+}
 </script>
 </body>
 </html>
