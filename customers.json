@@ -150,12 +150,12 @@
     },
     {
       "businessManager": "黄利鹏",
-      "customerName": "特",
+      "customerName": "潮州市潮安区佳特塑料实业有限公司",
       "dealStatus": "潜在",
       "customerType": "终端用户",
       "agent": "广州",
       "marketRegion": "广东潮州",
-      "address": "潮安区",
+      "address": "潮安区凤塘镇",
       "coordinates": "23.613287,116.571678",
       "contact": "舍利彬",
       "phone": "13828370989",
@@ -165,9 +165,9 @@
       "industry": "",
       "productLine": "",
       "employeeCount": "",
-      "pomMonthlyUsage": "",
-      "otherBrandsUsed": "",
-      "otherBrandUsage": "",
+      "pomMonthlyUsage": "10吨",
+      "otherBrandsUsed": "神华、兖矿",
+      "otherBrandUsage": "5-10吨",
       "otherPlasticUsage": "",
       "currentBrand": "",
       "selectionReason": "",
@@ -181,8 +181,9 @@
       "marketCapacity": "",
       "upstreamDistribution": "",
       "downstreamDistribution": "",
-      "otherInfo": "",
-      "entryTime": "2026-07-22T09:55:10.250Z"
+      "otherInfo": "市场竞争激烈，原来POM原料改为PP+铅替代，目前替代率约60%",
+      "entryTime": "2026-07-22T09:55:10.250Z",
+      "lastEditTime": "2026-07-22T12:00:29.587Z"
     }
   ]
 }
