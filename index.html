@@ -208,6 +208,11 @@ body {
   background: #fef2f2; color: #dc2626; font-size: 12px; cursor: pointer; transition: all .15s;
 }
 .ct-del-btn:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+.ct-edit-btn {
+  padding: 4px 12px; border: 1px solid #93c5fd; border-radius: 5px;
+  background: #eff6ff; color: #2563eb; font-size: 12px; cursor: pointer; transition: all .15s; margin-right: 6px;
+}
+.ct-edit-btn:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
 /* 定位按钮 */
 .loc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .loc-btn {
@@ -366,7 +371,7 @@ body {
   <div class="pw-dialog">
     <div class="pw-icon">🗑️</div>
     <h3>删除客户档案</h3>
-    <div class="pw-desc">确定要删除客户「<span id="delCustomerName" style="color:var(--text-primary);font-weight:600"></span>」的档案吗？<br>删除后页面不再显示，原始数据将保留备份并记录删除时间。</div>
+    <div class="pw-desc">确定要删除客户「<span id="delCustomerName" style="color:var(--text-primary);font-weight:600"></span>」的档案吗？</div>
     <div class="pw-btns">
       <button class="pw-cancel" onclick="closeDeleteModal()">取消</button>
       <button class="pw-confirm" id="delConfirmBtn" style="background:#ef4444" onclick="executeDeleteCustomer()">确认删除</button>
@@ -1010,7 +1015,7 @@ function showCustomerTable() {
     html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
     for (var i = 0; i < records.length; i++) {
       var rec = records[i];
-      html += '<tr onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td><td><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
+      html += '<tr onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
     }
     html += '</tbody></table></div>';
   }
@@ -1025,7 +1030,7 @@ function showCustomerDetail(index) {
   var rec = records[index];
   if (!rec) return;
   document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + (rec.customerName || '') + '</span>';
-  document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">返回列表</button>';
+  document.getElementById('topbarActions').innerHTML = '<button onclick="editCustomer(' + index + ')">✏️ 编辑</button><button onclick="showCustomerTable()">返回列表</button>';
   document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + marked.parse(generateCustomerMd(rec)) + '</div>';
   document.getElementById('contentWrap').scrollTop = 0;
 }
@@ -1077,6 +1082,110 @@ async function executeDeleteCustomer() {
   } finally {
     btn.disabled = false;
     btn.textContent = '确认删除';
+  }
+}
+
+/* ===== 编辑客户档案 ===== */
+var pendingEditIndex = -1;
+
+function editCustomer(index, event) {
+  if (event) { event.stopPropagation(); }
+  showCustomerEditForm(index);
+}
+
+function showCustomerEditForm(index) {
+  if (isProtected('05-客户档案') && !unlocked) {
+    requireUnlock('05-客户档案', function() { showCustomerEditForm(index); });
+    return;
+  }
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  var rec = records[index];
+  if (!rec) return;
+  pendingEditIndex = index;
+  currentFile = null;
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 编辑客户 / <span>' + (rec.customerName || '') + '</span>';
+  document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">返回列表</button>';
+  var html = '<div class="form-page"><div class="form-header"><div class="form-icon">✏️</div><div><div class="form-title">编辑客户档案</div><div class="form-desc">修改客户「' + (rec.customerName || '') + '」的信息后保存</div></div></div>';
+  for (var s = 0; s < FORM_SECTIONS.length; s++) {
+    var section = FORM_SECTIONS[s];
+    var isFirst = s === 0;
+    html += '<div class="form-section"><div class="form-section-title' + (isFirst ? ' open' : '') + '" onclick="toggleFormSection(this)">' + section.icon + ' ' + section.title + '<span class="fs-arrow">&#9654;</span></div>';
+    html += '<div class="form-section-body' + (isFirst ? ' open' : '') + '">';
+    if (section.title === '位置信息') {
+      html += '<div class="loc-row"><button type="button" class="loc-btn" onclick="getLocation()">📍 获取当前位置</button><span class="loc-status" id="locStatus">点击可重新获取手机定位</span></div>';
+    }
+    var fields = section.fields;
+    for (var f = 0; f < fields.length; f++) {
+      var field = fields[f];
+      var isFull = field.type === 'textarea';
+      var val = rec[field.key] || '';
+      var escapedVal = val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      html += '<div class="form-row' + (isFull ? ' full' : '') + '"><div class="form-field">';
+      html += '<label>' + field.label + (field.required ? '<span class="req">*</span>' : '') + '</label>';
+      if (field.type === 'select') {
+        html += '<select id="field_' + field.key + '"><option value="">请选择</option>';
+        for (var o = 0; o < field.options.length; o++) {
+          html += '<option value="' + field.options[o] + '"' + (val === field.options[o] ? ' selected' : '') + '>' + field.options[o] + '</option>';
+        }
+        html += '</select>';
+      } else if (field.type === 'textarea') {
+        html += '<textarea id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '">' + escapedVal + '</textarea>';
+      } else {
+        html += '<input type="text" id="field_' + field.key + '" value="' + escapedVal + '" placeholder="' + (field.placeholder || '') + '">';
+      }
+      html += '</div></div>';
+    }
+    html += '</div></div>';
+  }
+  html += '<div class="form-actions"><button class="form-submit" id="formSubmitBtn" onclick="saveCustomerEdit()">保存修改</button><button class="form-reset" onclick="showCustomerTable()">取消返回</button></div>';
+  html += '<div class="form-note">提示：带 <span style="color:#ef4444">*</span> 的为必填项。保存后数据将更新到 GitHub 仓库的 customers.json 文件中。</div>';
+  html += '</div>';
+  document.getElementById('contentWrap').innerHTML = html;
+  document.getElementById('contentWrap').scrollTop = 0;
+}
+
+async function saveCustomerEdit() {
+  var index = pendingEditIndex;
+  if (index < 0) return;
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  var rec = records[index];
+  if (!rec) { showToast('记录不存在'); return; }
+  /* 验证必填项 */
+  var nameEl = document.getElementById('field_customerName');
+  if (!nameEl || !nameEl.value.trim()) {
+    if (nameEl) nameEl.classList.add('error');
+    showToast('请填写「拜访客户名称」');
+    if (nameEl) nameEl.focus();
+    return;
+  }
+  nameEl.classList.remove('error');
+  /* 收集数据并更新记录（rec 与 customersData.records 中是同一对象引用） */
+  for (var s = 0; s < FORM_SECTIONS.length; s++) {
+    var fields = FORM_SECTIONS[s].fields;
+    for (var f = 0; f < fields.length; f++) {
+      var el = document.getElementById('field_' + fields[f].key);
+      if (el) rec[fields[f].key] = el.value;
+    }
+  }
+  rec.lastEditTime = new Date().toISOString();
+  /* 推送到 GitHub */
+  var btn = document.getElementById('formSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+  try {
+    var sha = await ghGetSha('customers.json');
+    await ghPutFile('customers.json', JSON.stringify(customersData, null, 2), sha);
+    mergeCustomers();
+    renderSidebar();
+    showToast('客户「' + (rec.customerName || '') + '」信息已更新');
+    setTimeout(function() { showCustomerTable(); }, 800);
+  } catch (e) {
+    showToast('保存失败：' + e.message);
+    btn.disabled = false;
+    btn.textContent = '保存修改';
   }
 }
 
@@ -1304,7 +1413,7 @@ function showCategoryPage(catKey) {
       html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
       for (var ci = 0; ci < custRecords.length; ci++) {
         var crec = custRecords[ci];
-        html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
+        html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
       }
       html += '</tbody></table></div>';
     }
