@@ -162,11 +162,11 @@
       "contact": "舍利彬",
       "phone": "13828370989",
       "contactTitle": "老板",
-      "registeredCapital": "",
-      "foundedDate": "",
-      "industry": "",
-      "productLine": "",
-      "employeeCount": "",
+      "registeredCapital": "500万元",
+      "foundedDate": "2010年",
+      "industry": "卫浴",
+      "productLine": "马桶水箱，卫浴柜",
+      "employeeCount": "50",
       "pomMonthlyUsage": "10吨",
       "otherBrandsUsed": "神华、兖矿",
       "otherBrandUsage": "5-10吨",
@@ -179,13 +179,13 @@
       "applicationField": "",
       "fieldDemand": "",
       "pomSpecDemand": "",
-      "corePainPoint": "",
+      "corePainPoint": "价格敏感型",
       "marketCapacity": "",
       "upstreamDistribution": "",
       "downstreamDistribution": "",
       "otherInfo": "市场竞争激烈，原来POM原料改为PP+铅替代，目前替代率约60%",
       "entryTime": "2026-07-22T09:55:10.250Z",
-      "lastEditTime": "2026-07-22T12:01:51.727Z"
+      "lastEditTime": "2026-07-22T12:30:01.356Z"
     }
   ]
 }
