@@ -189,7 +189,7 @@
     },
     {
       "businessManager": "黄利鹏",
-      "customerName": "潮州市阳光水球厂",
+      "customerName": "厦门阳光科技有限公司（阳光水球厂）",
       "dealStatus": "已成交",
       "customerType": "终端用户",
       "agent": "广州尧辰贸易有限公司",
@@ -197,13 +197,13 @@
       "address": "潮安区凤塘镇东门工业区",
       "coordinates": "23.619259,116.578286",
       "contact": "陈老板",
-      "phone": "13500100822",
+      "phone": "13500100855",
       "contactTitle": "老板",
       "registeredCapital": "50万",
       "foundedDate": "2010年",
       "industry": "卫浴",
       "productLine": "马桶配件",
-      "employeeCount": "20",
+      "employeeCount": "30",
       "pomMonthlyUsage": "30吨",
       "otherBrandsUsed": "",
       "otherBrandUsage": "",
@@ -221,7 +221,8 @@
       "upstreamDistribution": "",
       "downstreamDistribution": "",
       "otherInfo": "部分自用，部分批发周边终端工厂。",
-      "entryTime": "2026-07-22T12:47:07.659Z"
+      "entryTime": "2026-07-22T12:47:07.659Z",
+      "lastEditTime": "2026-07-22T12:51:35.545Z"
     }
   ]
 }
