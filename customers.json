@@ -106,7 +106,9 @@
       "upstreamDistribution": "",
       "downstreamDistribution": "",
       "otherInfo": "",
-      "entryTime": "2026-07-21T16:49:38.897Z"
+      "entryTime": "2026-07-21T16:49:38.897Z",
+      "deleted": true,
+      "deletedTime": "2026-07-22T08:58:24.353Z"
     },
     {
       "businessManager": "黄利鹏",
