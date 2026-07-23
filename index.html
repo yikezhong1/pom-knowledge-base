@@ -335,6 +335,40 @@ body {
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
   .form-row { grid-template-columns: 1fr; }
 }
+/* ===== 统计面板 ===== */
+.stats-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary); z-index: 300; display: none; overflow-y: auto; }
+.stats-overlay.show { display: block; }
+.stats-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: var(--bg-sidebar); color: #fff; position: sticky; top: 0; z-index: 1; }
+.stats-top h2 { font-size: 16px; font-weight: 600; }
+.stats-top .close-btn { background: rgba(255,255,255,.12); border: none; color: #fff; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.stats-top .close-btn:hover { background: rgba(255,255,255,.2); }
+.stats-body { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+.stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stats-card { background: var(--bg-card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); text-align: center; }
+.stats-card .num { font-size: 28px; font-weight: 700; color: var(--accent); }
+.stats-card .label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.stats-section { background: var(--bg-card); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.stats-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
+.stats-bar-row { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; }
+.stats-bar-label { width: 80px; text-align: right; padding-right: 10px; color: var(--text-secondary); flex-shrink: 0; }
+.stats-bar-track { flex: 1; height: 20px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.stats-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; min-width: 2px; transition: width .3s; }
+.stats-bar-val { width: 36px; text-align: right; padding-left: 8px; color: var(--text-secondary); flex-shrink: 0; }
+.stats-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.stats-tbl th { text-align: left; padding: 8px 6px; border-bottom: 2px solid var(--border); color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+.stats-tbl td { padding: 7px 6px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.stats-tbl tr:hover td { background: #f8fafc; }
+.stats-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: var(--accent-light); color: var(--accent); }
+.stats-pie-row { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; }
+.stats-pie-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+.stats-pie-name { flex: 1; color: var(--text-primary); }
+.stats-pie-val { color: var(--text-secondary); }
+.stats-loading { text-align: center; padding: 40px; color: var(--text-secondary); font-size: 14px; }
+.stats-pw { max-width: 320px; margin: 120px auto; text-align: center; }
+.stats-pw input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; margin: 12px 0; outline: none; }
+.stats-pw input:focus { border-color: var(--accent); }
+.stats-pw button { padding: 8px 28px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.stats-pw .err { color: #ef4444; font-size: 12px; display: none; }
 </style>
 </head>
 <body>
@@ -379,6 +413,26 @@ body {
     <div class="pw-btns">
       <button class="pw-cancel" onclick="closeDeleteModal()">取消</button>
       <button class="pw-confirm" id="delConfirmBtn" style="background:#ef4444" onclick="executeDeleteCustomer()">确认删除</button>
+    </div>
+  </div>
+</div>
+<!-- 统计面板 -->
+<div class="stats-overlay" id="statsOverlay">
+  <div class="stats-top">
+    <h2>📊 访问统计</h2>
+    <button class="close-btn" onclick="closeStats()">✕ 关闭</button>
+  </div>
+  <div class="stats-body" id="statsBody">
+    <div class="stats-pw" id="statsPw">
+      <div style="font-size:36px;margin-bottom:8px">🔐</div>
+      <h3 style="font-size:16px;font-weight:600">统计面板需要验证</h3>
+      <input type="password" id="statsPwInput" placeholder="请输入密码" onkeydown="if(event.key==='Enter')verifyStatsPw()">
+      <div class="err" id="statsPwErr">密码错误</div>
+      <button onclick="verifyStatsPw()">确认</button>
+    </div>
+    <div id="statsContent" style="display:none">
+      <div class="stats-loading" id="statsLoading">加载统计数据中...</div>
+      <div id="statsData" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -1639,6 +1693,177 @@ function showToast(msg) {
 }
 
 init();
+
+/* ===== 访问统计（静默采集 + GitHub存储） ===== */
+function trackVisit() {
+  if (sessionStorage.getItem('pom_visit_tracked')) return;
+  sessionStorage.setItem('pom_visit_tracked', '1');
+  var ua = navigator.userAgent;
+  var device = 'PC';
+  if (/Mobile|Android|iPhone|iPad/i.test(ua)) device = /iPad|Tablet/i.test(ua) ? '平板' : '手机';
+  var os = '未知';
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Mac OS/i.test(ua)) os = 'macOS';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/iPhone|iPad/i.test(ua)) os = 'iOS';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+  var browser = '未知';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/Chrome\//i.test(ua)) browser = 'Chrome';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/MSIE|Trident/i.test(ua)) browser = 'IE';
+  var visit = {
+    time: new Date().toISOString(),
+    device: device, os: os, browser: browser,
+    screen: screen.width + 'x' + screen.height,
+    lang: navigator.language || '',
+    referrer: document.referrer || '直接访问',
+    ip: '', location: ''
+  };
+  fetch('https://ipapi.co/json/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      visit.ip = d.ip || '';
+      visit.location = ((d.country_name || '') + ' ' + (d.region || '') + ' ' + (d.city || '')).trim();
+      saveVisit(visit);
+    })
+    .catch(function() { saveVisit(visit); });
+}
+
+function saveVisit(visit) {
+  var now = new Date();
+  var dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  var filePath = 'stats/' + dateStr + '.json';
+  var hdrs = { 'Authorization': 'token ' + GH_TOKEN, 'User-Agent': 'pom-stats', 'Content-Type': 'application/json' };
+  fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + filePath, { headers: hdrs })
+    .then(function(r) {
+      if (r.status === 200) return r.json();
+      if (r.status === 404) return null;
+      throw new Error('GET stats failed: ' + r.status);
+    })
+    .then(function(data) {
+      var visits = [], sha = null;
+      if (data && data.content) {
+        sha = data.sha;
+        try { visits = JSON.parse(decodeURIComponent(escape(atob(data.content)))); } catch(e) { visits = []; }
+      }
+      visits.push(visit);
+      var body = { message: 'stats: ' + dateStr, content: btoa(unescape(encodeURIComponent(JSON.stringify(visits)))) };
+      if (sha) body.sha = sha;
+      return fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + filePath, {
+        method: 'PUT', headers: hdrs, body: JSON.stringify(body)
+      });
+    })
+    .catch(function(e) { console.log('stats save error:', e); });
+}
+
+function openStats() { document.getElementById('statsOverlay').classList.add('show'); }
+function closeStats() { document.getElementById('statsOverlay').classList.remove('show'); }
+
+function verifyStatsPw() {
+  var val = document.getElementById('statsPwInput').value;
+  if (btoa(val) === PW_HASH) {
+    document.getElementById('statsPw').style.display = 'none';
+    document.getElementById('statsContent').style.display = 'block';
+    loadStats();
+  } else {
+    document.getElementById('statsPwErr').style.display = 'block';
+  }
+}
+
+function loadStats() {
+  document.getElementById('statsLoading').style.display = 'block';
+  document.getElementById('statsData').style.display = 'none';
+  var hdrs = { 'Authorization': 'token ' + GH_TOKEN, 'User-Agent': 'pom-stats' };
+  var days = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(); d.setDate(d.getDate() - i);
+    days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+  }
+  Promise.all(days.map(function(dateStr) {
+    return fetch('https://api.github.com/repos/' + GH_REPO + '/contents/stats/' + dateStr + '.json', { headers: hdrs })
+      .then(function(r) { return r.status === 200 ? r.json() : null; })
+      .then(function(data) {
+        if (data && data.content) {
+          try { return { date: dateStr, visits: JSON.parse(decodeURIComponent(escape(atob(data.content)))) }; }
+          catch(e) { return { date: dateStr, visits: [] }; }
+        }
+        return { date: dateStr, visits: [] };
+      })
+      .catch(function() { return { date: dateStr, visits: [] }; });
+  })).then(function(results) {
+    document.getElementById('statsLoading').style.display = 'none';
+    document.getElementById('statsData').style.display = 'block';
+    renderStatsData(results);
+  });
+}
+
+function renderStatsData(results) {
+  var allVisits = [], dailyCounts = [];
+  results.forEach(function(r) {
+    dailyCounts.push({ date: r.date, count: r.visits.length });
+    r.visits.forEach(function(v) { v._date = r.date; allVisits.push(v); });
+  });
+  var totalVisits = allVisits.length;
+  var todayCount = results[0] ? results[0].visits.length : 0;
+  var deviceMap = {}, browserMap = {}, osMap = {}, locMap = {};
+  allVisits.forEach(function(v) {
+    deviceMap[v.device] = (deviceMap[v.device] || 0) + 1;
+    browserMap[v.browser] = (browserMap[v.browser] || 0) + 1;
+    osMap[v.os] = (osMap[v.os] || 0) + 1;
+    locMap[v.location || '未知'] = (locMap[v.location || '未知'] || 0) + 1;
+  });
+  var maxCount = Math.max.apply(null, dailyCounts.map(function(d) { return d.count; }).concat([1]));
+  var colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+  var h = '';
+  /* 汇总卡片 */
+  h += '<div class="stats-cards">';
+  h += '<div class="stats-card"><div class="num">' + totalVisits + '</div><div class="label">近7天总访问</div></div>';
+  h += '<div class="stats-card"><div class="num">' + todayCount + '</div><div class="label">今日访问</div></div>';
+  h += '<div class="stats-card"><div class="num">' + Object.keys(locMap).length + '</div><div class="label">访问地域</div></div>';
+  h += '<div class="stats-card"><div class="num">' + Object.keys(deviceMap).length + '</div><div class="label">设备类型</div></div>';
+  h += '</div>';
+  /* 每日柱状图 */
+  h += '<div class="stats-section"><h3>每日访问量（近7天）</h3>';
+  dailyCounts.slice().reverse().forEach(function(d) {
+    var pct = Math.round(d.count / maxCount * 100);
+    h += '<div class="stats-bar-row"><span class="stats-bar-label">' + d.date.slice(5) + '</span>';
+    h += '<div class="stats-bar-track"><div class="stats-bar-fill" style="width:' + Math.max(pct, 2) + '%"></div></div>';
+    h += '<span class="stats-bar-val">' + d.count + '</span></div>';
+  });
+  h += '</div>';
+  /* 设备/浏览器/系统/地域分布 */
+  function pieSection(title, map) {
+    var keys = Object.keys(map);
+    var s = '<div class="stats-section"><h3>' + title + '</h3>';
+    keys.forEach(function(k, i) {
+      s += '<div class="stats-pie-row"><span class="stats-pie-dot" style="background:' + colors[i % colors.length] + '"></span>';
+      s += '<span class="stats-pie-name">' + k + '</span><span class="stats-pie-val">' + map[k] + '次</span></div>';
+    });
+    return s + '</div>';
+  }
+  h += pieSection('设备分布', deviceMap);
+  h += pieSection('浏览器分布', browserMap);
+  h += pieSection('操作系统', osMap);
+  h += pieSection('地域分布', locMap);
+  /* 访问明细 */
+  h += '<div class="stats-section"><h3>访问明细（最近50条）</h3><div style="overflow-x:auto">';
+  h += '<table class="stats-tbl"><thead><tr><th>时间</th><th>IP</th><th>位置</th><th>设备</th><th>系统</th><th>浏览器</th><th>屏幕</th><th>来源</th></tr></thead><tbody>';
+  allVisits.slice(-50).reverse().forEach(function(v) {
+    var t = v.time ? v.time.replace('T', ' ').slice(0, 19) : '-';
+    h += '<tr><td>' + t + '</td><td>' + (v.ip || '-') + '</td><td>' + (v.location || '-') + '</td>';
+    h += '<td>' + (v.device || '-') + '</td><td>' + (v.os || '-') + '</td><td>' + (v.browser || '-') + '</td>';
+    h += '<td>' + (v.screen || '-') + '</td>';
+    h += '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (v.referrer || '') + '">' + (v.referrer || '直接访问') + '</td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  document.getElementById('statsData').innerHTML = h;
+}
+
+/* 统计入口：?stats打开面板，否则静默采集 */
+setTimeout(trackVisit, 2000);
+if (location.search.indexOf('stats') >= 0) { openStats(); }
 
 /* ===== Service Worker 缓存 ===== */
 if ('serviceWorker' in navigator) {
