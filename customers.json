@@ -153,7 +153,7 @@
       "customerName": "汕头市澄海顺发明业玩具有限公司",
       "dealStatus": "潜在",
       "customerType": "终端用户",
-      "agent": "赵亚博",
+      "agent": "广州尧辰贸易有限公司",
       "marketRegion": "广东汕头",
       "address": "澄海区信宁工业区",
       "coordinates": "23.459135,116.789320",
@@ -182,7 +182,8 @@
       "upstreamDistribution": "",
       "downstreamDistribution": "",
       "otherInfo": "",
-      "entryTime": "2026-07-24T07:15:13.756Z"
+      "entryTime": "2026-07-24T07:15:13.756Z",
+      "lastEditTime": "2026-07-24T07:15:55.641Z"
     }
   ]
 }
