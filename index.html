@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POM 聚甲醛知识库</title>
 <script src="marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/7.0.0/fuse.min.js"></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -158,6 +160,8 @@ body {
 .sr-item .sr-name { font-size: 14px; font-weight: 600; }
 .sr-item .sr-cat { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
 .sr-item .sr-lock { font-size: 12px; margin-left: 8px; }
+.sr-item .sr-body { flex: 1; min-width: 0; }
+.sr-item .sr-snippet { font-size: 12px; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 分类卡片 */
 .welcome .categories-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
 .welcome .cat-card {
@@ -445,6 +449,59 @@ var openSubs = new Set();
 var openGroups = new Set();
 var searchMode = 'local';
 
+/* ===== XSS 防护：净化 HTML ===== */
+function safeHtml(html) {
+  if (typeof DOMPurify !== 'undefined') return DOMPurify.sanitize(html);
+  return html;
+}
+
+/* ===== 全文搜索索引 ===== */
+var searchDocs = [];
+var fuseInstance = null;
+
+function stripHtml(html) {
+  var tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function buildSearchIndex() {
+  searchDocs = [];
+  if (!kbData || !kbData.categories) return;
+  for (var catKey in kbData.categories) {
+    var cat = kbData.categories[catKey];
+    function addDoc(f, subfolder) {
+      if (!f.html) return;
+      var text = stripHtml(f.html);
+      if (text.length > 800) text = text.slice(0, 800);
+      searchDocs.push({
+        name: f.name, filename: f.filename,
+        category: catKey, catLabel: cat.label, catIcon: cat.icon,
+        subfolder: subfolder || '', text: text
+      });
+    }
+    (cat.files || []).forEach(function(f) { addDoc(f, ''); });
+    (cat.subfolders || []).forEach(function(sub) {
+      (sub.files || []).forEach(function(f) { addDoc(f, sub.name); });
+      (sub.groups || []).forEach(function(g) {
+        g.files.forEach(function(f) { addDoc(f, sub.name + '/' + g.name); });
+      });
+    });
+  }
+  if (typeof Fuse !== 'undefined') {
+    fuseInstance = new Fuse(searchDocs, {
+      keys: [
+        { name: 'name', weight: 3 },
+        { name: 'text', weight: 1 }
+      ],
+      threshold: 0.35,
+      ignoreLocation: true,
+      minMatchCharLength: 2,
+      includeMatches: true
+    });
+  }
+}
+
 /* ===== GitHub API 配置 ===== */
 var GH_TOKEN = 'github_pat_11CI4GPSA0ZMfOARAsQbwR_9FHMS7qi' + 'DCHLEGS8Oj3bpyg0lVWUkI3x1lBYhn8IDr7SL3QNO4IkRNSfXZk';
 var GH_REPO = 'yikezhong1/pom-knowledge-base';
@@ -584,14 +641,42 @@ var FORM_SECTIONS = [
 ];
 
 /* ===== 初始化 ===== */
+/* ===== URL 哈希路由 ===== */
+function navigateFromHash() {
+  var h = location.hash;
+  if (!h || h === '#' || h === '#/') return false;
+  var parts = h.replace(/^#\/?/, '').split('/').map(function(s) { return decodeURIComponent(s); });
+  if (parts.length < 2) return false;
+  var category = parts[0];
+  var filename, subfolder = '';
+  if (parts.length === 2) {
+    filename = parts[1];
+  } else {
+    subfolder = parts.slice(1, -1).join('/');
+    filename = parts[parts.length - 1];
+  }
+  if (!kbData || !kbData.categories || !kbData.categories[category]) return false;
+  var file = findFileInCat(kbData.categories[category], filename, subfolder);
+  if (!file) return false;
+  openFile(category, filename, subfolder ? encodeURIComponent(subfolder) : '');
+  return true;
+}
+window.addEventListener('hashchange', function() {
+  if (!navigateFromHash()) {
+    /* 哈希被清空或无效时回到首页 */
+    if (!location.hash || location.hash === '#' || location.hash === '#/') showWelcome();
+  }
+});
+
 async function init() {
   try {
     var res = await fetch('data.json');
     kbData = await res.json();
     await loadCustomers();
     mergeCustomers();
+    buildSearchIndex();
     renderSidebar();
-    showWelcome();
+    if (!navigateFromHash()) showWelcome();
   } catch (e) {
     document.getElementById('contentWrap').innerHTML = '<div class="pdf-notice"><div class="icon">⚠️</div><p>加载失败: ' + e.message + '</p></div>';
   }
@@ -603,6 +688,7 @@ async function refreshData() {
     kbData = await res.json();
     await loadCustomers();
     mergeCustomers();
+    buildSearchIndex();
     renderSidebar();
     showToast('数据已刷新 (' + new Date(kbData.buildTime).toLocaleString('zh-CN') + ')');
   } catch (e) { showToast('刷新失败'); }
@@ -667,6 +753,7 @@ function goHome() {
   openSubs.clear();
   openGroups.clear();
   document.getElementById('searchInput').value = '';
+  if (location.hash) location.hash = '';
   refreshData();
   showWelcome();
 }
@@ -847,6 +934,9 @@ function openFile(category, filename, subfolder) {
     return;
   }
   currentFile = { category: category, filename: filename, subfolder: subfolder || '' };
+  /* 更新 URL 哈希，支持分享/收藏/前进后退 */
+  var hashPath = '#/' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
+  if (location.hash !== hashPath) location.hash = hashPath;
   renderSidebar(document.getElementById('searchInput').value.trim());
   var content = document.getElementById('contentWrap');
   var catMeta = kbData.categories[category];
@@ -866,7 +956,7 @@ function openFile(category, filename, subfolder) {
   var modDate = new Date(file.modified).toLocaleString('zh-CN');
   var sizeKB = (file.size / 1024).toFixed(1);
   var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
-  content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + (file.html.indexOf('md-content') >= 0 ? file.html : '<div class="md-content">' + file.html + '</div>');
+  content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(file.html.indexOf('md-content') >= 0 ? file.html : '<div class="md-content">' + file.html + '</div>');
   content.scrollTop = 0;
 }
 
@@ -1227,7 +1317,7 @@ function showCustomerDetail(index) {
   if (!rec) return;
   document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + (rec.customerName || '') + '</span>';
   document.getElementById('topbarActions').innerHTML = '<button onclick="editCustomer(' + index + ')">✏️ 编辑</button><button onclick="showCustomerTable()">返回列表</button>';
-  document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + marked.parse(generateCustomerMd(rec)) + '</div>';
+  document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + safeHtml(marked.parse(generateCustomerMd(rec))) + '</div>';
   document.getElementById('contentWrap').scrollTop = 0;
 }
 
@@ -1518,7 +1608,7 @@ function showWelcome() {
     + '<div class="categories-grid">' + catsHtml + '</div>'
     + '</div>';
   if (kbData.readme) {
-    html += '<div style="max-width:860px;margin:30px auto 0"><div class="md-content">' + kbData.readme + '</div></div>';
+    html += '<div style="max-width:860px;margin:30px auto 0"><div class="md-content">' + safeHtml(kbData.readme) + '</div></div>';
   }
   document.getElementById('contentWrap').innerHTML = html;
 }
@@ -1554,37 +1644,66 @@ function onHomeSearch(val) {
   if (searchMode !== 'local') return;
   var container = document.getElementById('homeSearchResults');
   if (!container) return;
-  val = val.trim().toLowerCase();
+  val = val.trim();
   if (!val) { container.innerHTML = ''; return; }
+  var valLower = val.toLowerCase();
   var results = [];
-  for (var catKey in kbData.categories) {
-    if (isProtected(catKey) && !unlocked) continue;
-    var cat = kbData.categories[catKey];
-    (cat.files || []).forEach(function(f) {
-      if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: '' });
-    });
-    (cat.subfolders || []).forEach(function(sub) {
-      (sub.files || []).forEach(function(f) {
-        if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: sub.name });
+
+  /* 优先使用 Fuse.js 全文搜索 */
+  if (fuseInstance && val.length >= 2) {
+    var fuseResults = fuseInstance.search(val, { limit: 30 });
+    for (var i = 0; i < fuseResults.length; i++) {
+      var doc = fuseResults[i].item;
+      if (isProtected(doc.category) && !unlocked) continue;
+      /* 提取匹配摘要 */
+      var snippet = '';
+      var textLower = doc.text.toLowerCase();
+      var idx = textLower.indexOf(valLower);
+      if (idx >= 0) {
+        var start = Math.max(0, idx - 30);
+        var end = Math.min(doc.text.length, idx + val.length + 60);
+        snippet = (start > 0 ? '...' : '') + doc.text.slice(start, end) + (end < doc.text.length ? '...' : '');
+      } else {
+        snippet = doc.text.slice(0, 80) + (doc.text.length > 80 ? '...' : '');
+      }
+      results.push({ cat: doc.category, catLabel: doc.catLabel, catIcon: doc.catIcon, filename: doc.filename, name: doc.name, subfolder: doc.subfolder, snippet: snippet });
+    }
+  }
+
+  /* Fuse 无结果时回退到文件名匹配 */
+  if (results.length === 0) {
+    for (var catKey in kbData.categories) {
+      if (isProtected(catKey) && !unlocked) continue;
+      var cat = kbData.categories[catKey];
+      (cat.files || []).forEach(function(f) {
+        if (f.name.toLowerCase().indexOf(valLower) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, filename: f.filename, name: f.name, subfolder: '', snippet: '' });
       });
-      (sub.groups || []).forEach(function(g) {
-        g.files.forEach(function(f) {
-          if (f.name.toLowerCase().indexOf(val) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, file: f, subfolder: sub.name + '/' + g.name });
+      (cat.subfolders || []).forEach(function(sub) {
+        (sub.files || []).forEach(function(f) {
+          if (f.name.toLowerCase().indexOf(valLower) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, filename: f.filename, name: f.name, subfolder: sub.name, snippet: '' });
+        });
+        (sub.groups || []).forEach(function(g) {
+          g.files.forEach(function(f) {
+            if (f.name.toLowerCase().indexOf(valLower) >= 0) results.push({ cat: catKey, catLabel: cat.label, catIcon: cat.icon, filename: f.filename, name: f.name, subfolder: sub.name + '/' + g.name, snippet: '' });
+          });
         });
       });
-    });
+    }
   }
+
   if (results.length === 0) {
-    container.innerHTML = '<div class="search-results"><div class="sr-title">未找到匹配的文件</div></div>';
+    container.innerHTML = '<div class="search-results"><div class="sr-title">未找到匹配的内容</div></div>';
     return;
   }
   var html = '<div class="search-results"><div class="sr-title">找到 ' + results.length + ' 个结果</div>';
-  for (var i = 0; i < results.length && i < 20; i++) {
-    var r = results[i];
+  for (var j = 0; j < results.length && j < 20; j++) {
+    var r = results[j];
     var sfAttr = r.subfolder ? encodeURIComponent(r.subfolder) : '';
-    html += '<div class="sr-item" onclick="openFile(\'' + r.cat + '\',\'' + r.file.filename + '\',\'' + sfAttr + '\')">'
+    html += '<div class="sr-item" onclick="openFile(\'' + r.cat + '\',\'' + r.filename + '\',\'' + sfAttr + '\')">'
       + '<span class="sr-icon">' + r.catIcon + '</span>'
-      + '<span class="sr-name">' + r.file.name + '</span>'
+      + '<div class="sr-body"><span class="sr-name">' + r.name + '</span>'
+      + (r.snippet ? '<div class="sr-snippet">' + r.snippet.replace(/</g, '&lt;') + '</div>' : '')
+      + '</div>'
       + '<span class="sr-cat">' + r.catLabel + (r.subfolder ? ' / ' + r.subfolder : '') + '</span>'
       + '</div>';
   }
@@ -1724,7 +1843,8 @@ function trackVisit() {
   fetch('https://ipapi.co/json/')
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      visit.ip = d.ip || '';
+      var rawIp = d.ip || '';
+      visit.ip = rawIp.replace(/\.\d+$/, '.*');
       visit.location = ((d.country_name || '') + ' ' + (d.region || '') + ' ' + (d.city || '')).trim();
       saveVisit(visit);
     })
