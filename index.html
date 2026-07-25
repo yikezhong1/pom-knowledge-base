@@ -502,8 +502,8 @@ function buildSearchIndex() {
   }
 }
 
-/* ===== Worker 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
-var WORKER_URL = 'https://pom-api.pom-kb.workers.dev';  /* ← 替换为你的 Worker 域名 */
+/* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
+var WORKER_URL = 'https://pom-kb-api.vercel.app/api';  /* ← 替换为你的 Vercel 项目域名 + /api */
 
 /* ===== 密码保护 ===== */
 var PW_HASH = 'cG9tMjAyNg==';
