@@ -1787,9 +1787,11 @@ function showToast(msg) {
 init();
 
 /* ===== 访问统计（静默采集 + GitHub存储） ===== */
+var STATS_REPORT_ENABLED = false; // 写侧 Worker 部署在 Vercel，国内不可达；暂时停止访客上报/采集，避免无效请求挂起。迁移到国内服务后改为 true 即可恢复（同时改 WORKER_URL）
 function trackVisit() {
   if (sessionStorage.getItem('pom_visit_tracked')) return;
   sessionStorage.setItem('pom_visit_tracked', '1');
+  if (!STATS_REPORT_ENABLED) return; // 写侧不可用，暂停上报（采集/上报逻辑已就绪，迁移后启用）
   var ua = navigator.userAgent;
   var device = 'PC';
   if (/Mobile|Android|iPhone|iPad/i.test(ua)) device = /iPad|Tablet/i.test(ua) ? '平板' : '手机';
