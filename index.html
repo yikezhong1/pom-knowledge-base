@@ -448,6 +448,7 @@ body {
           <button class="range-btn" data-days="30" onclick="loadStats(30)">近30天</button>
           <button class="range-btn" data-days="90" onclick="loadStats(90)">近90天</button>
         </div>
+        <button class="export-btn" id="realtimeBtn" onclick="loadStats(currentStatsDays, true)" title="绕过 CDN 缓存，直接从阿里云服务器拉取最新数据（可能稍慢 1~3 秒）">🔄 拉取实时数据</button>
         <button class="export-btn" onclick="exportStatsCSV()">⬇ 导出CSV</button>
       </div>
       <div class="stats-loading" id="statsLoading">加载统计数据中...</div>
@@ -1877,24 +1878,44 @@ function verifyStatsPw() {
 
 var currentStatsDays = 7;
 var currentStatsResults = [];
-function loadStats(days) {
+function loadStats(days, realtime) {
   days = days || currentStatsDays || 7;
   currentStatsDays = days;
   document.querySelectorAll('.range-btn').forEach(function(b){ b.classList.toggle('active', +b.dataset.days === days); });
+  var rtBtn = document.getElementById('realtimeBtn');
+  var useRealtime = !!realtime;
+  var reqDays = days;
+  var clamped = false;
+  if (useRealtime && days > 30) { reqDays = 30; clamped = true; } // FC 实时接口上限 30 天
   document.getElementById('statsLoading').style.display = 'block';
+  document.getElementById('statsLoading').textContent = useRealtime ? '正在从服务器拉取实时数据...' : '加载统计数据中...';
   document.getElementById('statsData').style.display = 'none';
-  // 直连 GitHub（经 jsDelivr CDN，国内可达），前端按天聚合，绕过 Vercel Worker（国内不可达）
-  fetchStatsFromGitHub(days)
+  if (rtBtn && useRealtime) { rtBtn.disabled = true; rtBtn.textContent = '拉取中...'; }
+  // 默认走 jsDelivr CDN（快，最长约12h缓存）；点"拉取实时数据"走阿里云 FC（实时，绕过缓存）
+  var loader = useRealtime ? fetchStatsFromFC(reqDays) : fetchStatsFromGitHub(days);
+  loader
     .then(function(results) {
+      var renderDays = useRealtime ? results.length : days;
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
       currentStatsResults = results;
-      renderStatsData(results, days);
+      renderStatsData(results, renderDays);
+      if (rtBtn) {
+        rtBtn.disabled = false;
+        if (useRealtime) {
+          rtBtn.textContent = clamped ? '✅ 实时(近30天)' : '✅ 实时数据';
+          setTimeout(function(){ rtBtn.textContent = '🔄 拉取实时数据'; }, 2500);
+        } else {
+          rtBtn.textContent = '🔄 拉取实时数据';
+        }
+      }
     })
     .catch(function(e) {
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
-      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '<br><span style="font-size:12px;opacity:.7">已尝试直连 GitHub 读取（Vercel Worker 国内不可达）</span></div>';
+      if (rtBtn) { rtBtn.disabled = false; rtBtn.textContent = '🔄 拉取实时数据'; }
+      var tip = useRealtime ? '实时接口请求失败，请稍后重试或改用默认（CDN）模式' : '已尝试经 jsDelivr CDN 读取（Vercel Worker 国内不可达）';
+      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '<br><span style="font-size:12px;opacity:.7">' + tip + '</span></div>';
     });
 }
 
@@ -1916,6 +1937,19 @@ function fetchStatsFromGitHub(days) {
     })(ds);
   }
   return Promise.all(tasks);
+}
+
+/* 实时读取：直连阿里云 FC（绕过 CDN 缓存），FC 返回 {results:[{date,visits}]}（今天在前）；
+   reverse 成 旧→新 顺序，与 jsDelivr 版保持一致，供 renderStatsData 复用 */
+function fetchStatsFromFC(days) {
+  return fetch(WORKER_URL + '/stats?days=' + days, { cache: 'no-store' })
+    .then(function(r) { if (!r.ok) throw new Error('实时接口 HTTP ' + r.status); return r.json(); })
+    .then(function(j) {
+      var results = (j && j.results) || [];
+      return results.slice().reverse().map(function(x) {
+        return { date: x.date, visits: Array.isArray(x.visits) ? x.visits : [] };
+      });
+    });
 }
 
 function escapeHtml(s) {
