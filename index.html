@@ -353,6 +353,13 @@ body {
 .stats-card .label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
 .stats-section { background: var(--bg-card); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 16px; }
 .stats-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
+.stats-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.stats-range { display: flex; gap: 6px; }
+.range-btn { background: var(--bg-card); border: 1px solid var(--border, #e5e7eb); color: var(--text-secondary); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.range-btn:hover { border-color: var(--accent); }
+.range-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.export-btn { background: transparent; border: 1px solid var(--border, #e5e7eb); color: var(--text-secondary); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.export-btn:hover { border-color: var(--accent); color: var(--accent); }
 .stats-bar-row { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; }
 .stats-bar-label { width: 80px; text-align: right; padding-right: 10px; color: var(--text-secondary); flex-shrink: 0; }
 .stats-bar-track { flex: 1; height: 20px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
@@ -435,6 +442,14 @@ body {
       <button onclick="verifyStatsPw()">确认</button>
     </div>
     <div id="statsContent" style="display:none">
+      <div class="stats-toolbar">
+        <div class="stats-range">
+          <button class="range-btn active" data-days="7" onclick="loadStats(7)">近7天</button>
+          <button class="range-btn" data-days="30" onclick="loadStats(30)">近30天</button>
+          <button class="range-btn" data-days="90" onclick="loadStats(90)">近90天</button>
+        </div>
+        <button class="export-btn" onclick="exportStatsCSV()">⬇ 导出CSV</button>
+      </div>
       <div class="stats-loading" id="statsLoading">加载统计数据中...</div>
       <div id="statsData" style="display:none"></div>
     </div>
@@ -1839,24 +1854,35 @@ function verifyStatsPw() {
   }
 }
 
-function loadStats() {
+var currentStatsDays = 7;
+var currentStatsResults = [];
+function loadStats(days) {
+  days = days || 7;
+  currentStatsDays = days;
+  document.querySelectorAll('.range-btn').forEach(function(b){ b.classList.toggle('active', +b.dataset.days === days); });
   document.getElementById('statsLoading').style.display = 'block';
   document.getElementById('statsData').style.display = 'none';
-  fetch(WORKER_URL + '/stats?days=7')
+  fetch(WORKER_URL + '/stats?days=' + days)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
-      renderStatsData(data.results || []);
+      currentStatsResults = data.results || [];
+      renderStatsData(currentStatsResults, days);
     })
     .catch(function(e) {
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
-      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + e.message + '</div>';
+      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '</div>';
     });
 }
 
-function renderStatsData(results) {
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function renderStatsData(results, days) {
   var allVisits = [], dailyCounts = [];
   results.forEach(function(r) {
     dailyCounts.push({ date: r.date, count: r.visits.length });
@@ -1866,56 +1892,75 @@ function renderStatsData(results) {
   var todayCount = results[0] ? results[0].visits.length : 0;
   var deviceMap = {}, browserMap = {}, osMap = {}, locMap = {};
   allVisits.forEach(function(v) {
-    deviceMap[v.device] = (deviceMap[v.device] || 0) + 1;
-    browserMap[v.browser] = (browserMap[v.browser] || 0) + 1;
-    osMap[v.os] = (osMap[v.os] || 0) + 1;
-    locMap[v.location || '未知'] = (locMap[v.location || '未知'] || 0) + 1;
+    deviceMap[v.device || '未知'] = (deviceMap[v.device || '未知'] || 0) + 1;
+    browserMap[v.browser || '未知'] = (browserMap[v.browser || '未知'] || 0) + 1;
+    osMap[v.os || '未知'] = (osMap[v.os || '未知'] || 0) + 1;
+    if (v.location) locMap[v.location] = (locMap[v.location] || 0) + 1;
   });
   var maxCount = Math.max.apply(null, dailyCounts.map(function(d) { return d.count; }).concat([1]));
   var colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+  var avg = days ? Math.round(totalVisits / days * 10) / 10 : totalVisits;
+  var peak = dailyCounts.reduce(function(a, b){ return b.count > a.count ? b : a; }, {date:'-', count:0});
   var h = '';
   /* 汇总卡片 */
   h += '<div class="stats-cards">';
-  h += '<div class="stats-card"><div class="num">' + totalVisits + '</div><div class="label">近7天总访问</div></div>';
-  h += '<div class="stats-card"><div class="num">' + todayCount + '</div><div class="label">今日访问</div></div>';
-  h += '<div class="stats-card"><div class="num">' + Object.keys(locMap).length + '</div><div class="label">访问地域</div></div>';
-  h += '<div class="stats-card"><div class="num">' + Object.keys(deviceMap).length + '</div><div class="label">设备类型</div></div>';
+  h += '<div class="stats-card"><div class="num">' + totalVisits + '</div><div class="label">近' + days + '天总访问</div></div>';
+  h += '<div class="stats-card"><div class="num">' + todayCount + '</div><div class="label">最新一天访问</div></div>';
+  h += '<div class="stats-card"><div class="num">' + avg + '</div><div class="label">日均访问</div></div>';
+  h += '<div class="stats-card"><div class="num">' + peak.date.slice(5) + '</div><div class="label">峰值日 ' + peak.count + '次</div></div>';
   h += '</div>';
   /* 每日柱状图 */
-  h += '<div class="stats-section"><h3>每日访问量（近7天）</h3>';
+  h += '<div class="stats-section"><h3>每日访问量（近' + days + '天）</h3>';
   dailyCounts.slice().reverse().forEach(function(d) {
     var pct = Math.round(d.count / maxCount * 100);
-    h += '<div class="stats-bar-row"><span class="stats-bar-label">' + d.date.slice(5) + '</span>';
+    h += '<div class="stats-bar-row"><span class="stats-bar-label">' + escapeHtml(d.date.slice(5)) + '</span>';
     h += '<div class="stats-bar-track"><div class="stats-bar-fill" style="width:' + Math.max(pct, 2) + '%"></div></div>';
     h += '<span class="stats-bar-val">' + d.count + '</span></div>';
   });
   h += '</div>';
   /* 设备/浏览器/系统/地域分布 */
-  function pieSection(title, map) {
+  function pieSection(title, map, emptyTip) {
     var keys = Object.keys(map);
     var s = '<div class="stats-section"><h3>' + title + '</h3>';
+    if (!keys.length) { s += '<div style="color:var(--text-secondary);font-size:13px;padding:8px 0">' + (emptyTip || '暂无数据') + '</div>'; return s + '</div>'; }
     keys.forEach(function(k, i) {
       s += '<div class="stats-pie-row"><span class="stats-pie-dot" style="background:' + colors[i % colors.length] + '"></span>';
-      s += '<span class="stats-pie-name">' + k + '</span><span class="stats-pie-val">' + map[k] + '次</span></div>';
+      s += '<span class="stats-pie-name">' + escapeHtml(k) + '</span><span class="stats-pie-val">' + map[k] + '次</span></div>';
     });
     return s + '</div>';
   }
   h += pieSection('设备分布', deviceMap);
   h += pieSection('浏览器分布', browserMap);
   h += pieSection('操作系统', osMap);
-  h += pieSection('地域分布', locMap);
+  h += pieSection('地域分布', locMap, '已停止采集 IP，暂无地域数据');
   /* 访问明细 */
   h += '<div class="stats-section"><h3>访问明细（最近50条）</h3><div style="overflow-x:auto">';
   h += '<table class="stats-tbl"><thead><tr><th>时间</th><th>IP</th><th>位置</th><th>设备</th><th>系统</th><th>浏览器</th><th>屏幕</th><th>来源</th></tr></thead><tbody>';
   allVisits.slice(-50).reverse().forEach(function(v) {
-    var t = v.time ? v.time.replace('T', ' ').slice(0, 19) : '-';
-    h += '<tr><td>' + t + '</td><td>' + (v.ip || '-') + '</td><td>' + (v.location || '-') + '</td>';
-    h += '<td>' + (v.device || '-') + '</td><td>' + (v.os || '-') + '</td><td>' + (v.browser || '-') + '</td>';
-    h += '<td>' + (v.screen || '-') + '</td>';
-    h += '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (v.referrer || '') + '">' + (v.referrer || '直接访问') + '</td></tr>';
+    var t = v.time ? escapeHtml(v.time.replace('T', ' ').slice(0, 19)) : '-';
+    h += '<tr><td>' + t + '</td><td>' + (v.ip ? escapeHtml(v.ip) : '未采集') + '</td><td>' + (v.location ? escapeHtml(v.location) : '未采集') + '</td>';
+    h += '<td>' + (v.device ? escapeHtml(v.device) : '-') + '</td><td>' + (v.os ? escapeHtml(v.os) : '-') + '</td><td>' + (v.browser ? escapeHtml(v.browser) : '-') + '</td>';
+    h += '<td>' + (v.screen ? escapeHtml(v.screen) : '-') + '</td>';
+    h += '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(v.referrer || '') + '">' + (v.referrer ? escapeHtml(v.referrer) : '直接访问') + '</td></tr>';
   });
   h += '</tbody></table></div></div>';
   document.getElementById('statsData').innerHTML = h;
+}
+
+function exportStatsCSV() {
+  if (!currentStatsResults.length) { alert('暂无数据可导出'); return; }
+  var rows = [['日期','时间','设备','系统','浏览器','屏幕','来源','IP','位置']];
+  currentStatsResults.forEach(function(r){
+    r.visits.forEach(function(v){
+      rows.push([r.date, v.time || '', v.device || '', v.os || '', v.browser || '', v.screen || '', v.referrer || '', v.ip || '', v.location || '']);
+    });
+  });
+  var csv = '﻿' + rows.map(function(row){ return row.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(','); }).join('\r\n');
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '访问统计_' + currentStatsDays + '天_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 /* 统计入口：?stats打开面板，否则静默采集 */
