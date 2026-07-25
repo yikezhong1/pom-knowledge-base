@@ -502,10 +502,8 @@ function buildSearchIndex() {
   }
 }
 
-/* ===== GitHub API 配置 ===== */
-var GH_TOKEN = 'github_pat_11CI4GPSA0ZMfOARAsQbwR_9FHMS7qi' + 'DCHLEGS8Oj3bpyg0lVWUkI3x1lBYhn8IDr7SL3QNO4IkRNSfXZk';
-var GH_REPO = 'yikezhong1/pom-knowledge-base';
-var GH_API = 'https://api.github.com/repos/' + GH_REPO + '/contents/customers.json';
+/* ===== Worker 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
+var WORKER_URL = 'https://pom-api.pom-kb.workers.dev';  /* ← 替换为你的 Worker 域名 */
 
 /* ===== 密码保护 ===== */
 var PW_HASH = 'cG9tMjAyNg==';
@@ -697,13 +695,23 @@ async function refreshData() {
 /* ===== customers.json 加载与合并 ===== */
 async function loadCustomers() {
   try {
-    var res = await fetch('customers.json?t=' + Date.now());
+    var res = await fetch(WORKER_URL + '/customers?t=' + Date.now());
     if (res.ok) {
-      customersData = await res.json();
+      var data = await res.json();
+      customersData = data || { records: [] };
+      return;
+    }
+  } catch (e) {
+    console.warn('Worker不可用，回退到本地数据', e);
+  }
+  try {
+    var res2 = await fetch('customers.json?t=' + Date.now());
+    if (res2.ok) {
+      customersData = await res2.json();
     } else {
       customersData = { records: [] };
     }
-  } catch (e) {
+  } catch (e2) {
     customersData = { records: [] };
   }
 }
@@ -1241,21 +1249,16 @@ async function submitCustomerForm() {
   btn.disabled = true;
   btn.textContent = '提交中...';
   try {
-    /* 获取最新的 customers.json SHA */
-    var sha = await ghGetSha('customers.json');
-    var existing = { records: [] };
-    if (sha) {
-      try {
-        var res = await fetch('customers.json?t=' + Date.now());
-        if (res.ok) existing = await res.json();
-      } catch(e) {}
-    }
-    if (!existing.records) existing.records = [];
-    existing.records.push(record);
-    /* 推送更新 */
-    await ghPutFile('customers.json', JSON.stringify(existing, null, 2), sha);
+    /* 通过 Worker 提交 */
+    var res = await fetch(WORKER_URL + '/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add', record: record })
+    });
+    if (!res.ok) { var err = await res.json(); throw new Error(err.error || '提交失败'); }
+    var result = await res.json();
     /* 更新本地数据 */
-    customersData = existing;
+    customersData = { records: result.records || [] };
     mergeCustomers();
     renderSidebar();
     showToast('提交成功！客户「' + record.customerName + '」已保存');
@@ -1351,12 +1354,17 @@ async function executeDeleteCustomer() {
   btn.disabled = true;
   btn.textContent = '删除中...';
   try {
-    /* 软删除：打标记+记录删除时间，原始数据保留在 customers.json 中（rec 与 customersData.records 中是同一对象引用） */
-    rec.deleted = true;
-    rec.deletedTime = new Date().toISOString();
-    /* 获取最新 SHA 并推送 */
-    var sha = await ghGetSha('customers.json');
-    await ghPutFile('customers.json', JSON.stringify(customersData, null, 2), sha);
+    /* 找到记录在原始数组中的索引 */
+    var rawIndex = customersData.records.indexOf(rec);
+    /* 通过 Worker 软删除 */
+    var res = await fetch(WORKER_URL + '/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', index: rawIndex })
+    });
+    if (!res.ok) { var err = await res.json(); throw new Error(err.error || '删除失败'); }
+    var result = await res.json();
+    customersData = { records: result.records || [] };
     /* 更新本地显示（过滤已删除记录） */
     mergeCustomers();
     renderSidebar();
@@ -1487,13 +1495,20 @@ async function saveCustomerEdit() {
     }
   }
   rec.lastEditTime = new Date().toISOString();
-  /* 推送到 GitHub */
+  /* 通过 Worker 更新 */
   var btn = document.getElementById('formSubmitBtn');
   btn.disabled = true;
   btn.textContent = '保存中...';
   try {
-    var sha = await ghGetSha('customers.json');
-    await ghPutFile('customers.json', JSON.stringify(customersData, null, 2), sha);
+    var rawIndex = customersData.records.indexOf(rec);
+    var res = await fetch(WORKER_URL + '/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', index: rawIndex, record: rec })
+    });
+    if (!res.ok) { var err = await res.json(); throw new Error(err.error || '保存失败'); }
+    var result = await res.json();
+    customersData = { records: result.records || [] };
     mergeCustomers();
     renderSidebar();
     showToast('客户「' + (rec.customerName || '') + '」信息已更新');
@@ -1503,55 +1518,6 @@ async function saveCustomerEdit() {
     btn.disabled = false;
     btn.textContent = '保存修改';
   }
-}
-
-/* ===== GitHub API 操作 ===== */
-function ghGetSha(filename) {
-  return new Promise(function(resolve, reject) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://api.github.com/repos/' + GH_REPO + '/contents/' + filename, true);
-    xhr.setRequestHeader('Authorization', 'token ' + GH_TOKEN);
-    xhr.setRequestHeader('User-Agent', 'pom-kb-viewer');
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        try { resolve(JSON.parse(xhr.responseText).sha); }
-        catch(e) { resolve(null); }
-      } else if (xhr.status === 404) {
-        resolve(null);
-      } else {
-        reject(new Error('获取文件信息失败 (' + xhr.status + ')'));
-      }
-    };
-    xhr.onerror = function() { reject(new Error('网络请求失败')); };
-    xhr.send();
-  });
-}
-
-function ghPutFile(filename, content, sha) {
-  return new Promise(function(resolve, reject) {
-    var b64 = btoa(unescape(encodeURIComponent(content)));
-    var body = JSON.stringify({
-      message: 'feat: 在线填报客户档案更新',
-      content: b64,
-      sha: sha || undefined
-    });
-    var xhr = new XMLHttpRequest();
-    xhr.open('PUT', 'https://api.github.com/repos/' + GH_REPO + '/contents/' + filename, true);
-    xhr.setRequestHeader('Authorization', 'token ' + GH_TOKEN);
-    xhr.setRequestHeader('User-Agent', 'pom-kb-viewer');
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.onload = function() {
-      if (xhr.status === 200 || xhr.status === 201) {
-        resolve(JSON.parse(xhr.responseText));
-      } else {
-        var msg = '';
-        try { msg = JSON.parse(xhr.responseText).message || ''; } catch(e) {}
-        reject(new Error('保存失败 (' + xhr.status + ') ' + msg));
-      }
-    };
-    xhr.onerror = function() { reject(new Error('网络请求失败')); };
-    xhr.send(body);
-  });
 }
 
 /* ===== 首页 ===== */
@@ -1852,30 +1818,11 @@ function trackVisit() {
 }
 
 function saveVisit(visit) {
-  var now = new Date();
-  var dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-  var filePath = 'stats/' + dateStr + '.json';
-  var hdrs = { 'Authorization': 'token ' + GH_TOKEN, 'User-Agent': 'pom-stats', 'Content-Type': 'application/json' };
-  fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + filePath, { headers: hdrs })
-    .then(function(r) {
-      if (r.status === 200) return r.json();
-      if (r.status === 404) return null;
-      throw new Error('GET stats failed: ' + r.status);
-    })
-    .then(function(data) {
-      var visits = [], sha = null;
-      if (data && data.content) {
-        sha = data.sha;
-        try { visits = JSON.parse(decodeURIComponent(escape(atob(data.content)))); } catch(e) { visits = []; }
-      }
-      visits.push(visit);
-      var body = { message: 'stats: ' + dateStr, content: btoa(unescape(encodeURIComponent(JSON.stringify(visits)))) };
-      if (sha) body.sha = sha;
-      return fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + filePath, {
-        method: 'PUT', headers: hdrs, body: JSON.stringify(body)
-      });
-    })
-    .catch(function(e) { console.log('stats save error:', e); });
+  fetch(WORKER_URL + '/stats', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ visit: visit })
+  }).catch(function(e) { console.log('stats save error:', e); });
 }
 
 function openStats() { document.getElementById('statsOverlay').classList.add('show'); }
@@ -1895,28 +1842,18 @@ function verifyStatsPw() {
 function loadStats() {
   document.getElementById('statsLoading').style.display = 'block';
   document.getElementById('statsData').style.display = 'none';
-  var hdrs = { 'Authorization': 'token ' + GH_TOKEN, 'User-Agent': 'pom-stats' };
-  var days = [];
-  for (var i = 0; i < 7; i++) {
-    var d = new Date(); d.setDate(d.getDate() - i);
-    days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
-  }
-  Promise.all(days.map(function(dateStr) {
-    return fetch('https://api.github.com/repos/' + GH_REPO + '/contents/stats/' + dateStr + '.json', { headers: hdrs })
-      .then(function(r) { return r.status === 200 ? r.json() : null; })
-      .then(function(data) {
-        if (data && data.content) {
-          try { return { date: dateStr, visits: JSON.parse(decodeURIComponent(escape(atob(data.content)))) }; }
-          catch(e) { return { date: dateStr, visits: [] }; }
-        }
-        return { date: dateStr, visits: [] };
-      })
-      .catch(function() { return { date: dateStr, visits: [] }; });
-  })).then(function(results) {
-    document.getElementById('statsLoading').style.display = 'none';
-    document.getElementById('statsData').style.display = 'block';
-    renderStatsData(results);
-  });
+  fetch(WORKER_URL + '/stats?days=7')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('statsLoading').style.display = 'none';
+      document.getElementById('statsData').style.display = 'block';
+      renderStatsData(data.results || []);
+    })
+    .catch(function(e) {
+      document.getElementById('statsLoading').style.display = 'none';
+      document.getElementById('statsData').style.display = 'block';
+      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + e.message + '</div>';
+    });
 }
 
 function renderStatsData(results) {
