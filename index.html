@@ -518,7 +518,7 @@ function buildSearchIndex() {
 }
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
-var WORKER_URL = 'https://pom-kb-api.vercel.app/api';  /* ← 替换为你的 Vercel 项目域名 + /api */
+var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
 
 /* ===== 密码保护 ===== */
 var PW_HASH = 'cG9tMjAyNg==';
@@ -1787,7 +1787,7 @@ function showToast(msg) {
 init();
 
 /* ===== 访问统计（静默采集 + GitHub存储） ===== */
-var STATS_REPORT_ENABLED = false; // 写侧 Worker 部署在 Vercel，国内不可达；暂时停止访客上报/采集，避免无效请求挂起。迁移到国内服务后改为 true 即可恢复（同时改 WORKER_URL）
+var STATS_REPORT_ENABLED = true; // 写侧已迁至阿里云 FC（国内可达），恢复访客上报与 IP 采集
 function trackVisit() {
   if (sessionStorage.getItem('pom_visit_tracked')) return;
   sessionStorage.setItem('pom_visit_tracked', '1');
@@ -1818,7 +1818,7 @@ function trackVisit() {
   fetchVisitIp().then(function(ipInfo) {
     if (ipInfo && ipInfo.ip) {
       // 末端打码：保留前3段 + 归属地，兼顾地域分析与隐私合规
-      visit.ip = ipInfo.ip.replace(/\.\d+$/, '.*');
+      visit.ip = ipInfo.ip.replace(/\.\d+$/, '.');  // 对齐 Qoder 原方案：末段打码为 113.108.145.（尾点）
       visit.location = ipInfo.location || '';
     }
     saveVisit(visit);
