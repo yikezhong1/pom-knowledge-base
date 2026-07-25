@@ -709,26 +709,18 @@ async function refreshData() {
 
 /* ===== customers.json 加载与合并 ===== */
 async function loadCustomers() {
+  // 直连 GitHub（经 jsDelivr CDN，国内可达），绕过 Vercel Worker（国内不可达）
+  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/customers.json?_=' + Date.now();
   try {
-    var res = await fetch(WORKER_URL + '/customers?t=' + Date.now());
+    var res = await fetch(CDN);
     if (res.ok) {
-      var data = await res.json();
-      customersData = data || { records: [] };
+      customersData = await res.json() || { records: [] };
       return;
     }
   } catch (e) {
-    console.warn('Worker不可用，回退到本地数据', e);
+    console.warn('jsDelivr 读取客户档案失败', e);
   }
-  try {
-    var res2 = await fetch('customers.json?t=' + Date.now());
-    if (res2.ok) {
-      customersData = await res2.json();
-    } else {
-      customersData = { records: [] };
-    }
-  } catch (e2) {
-    customersData = { records: [] };
-  }
+  customersData = { records: [] };
 }
 
 function mergeCustomers() {
@@ -1884,24 +1876,44 @@ function verifyStatsPw() {
 var currentStatsDays = 7;
 var currentStatsResults = [];
 function loadStats(days) {
-  days = days || 7;
+  days = days || currentStatsDays || 7;
   currentStatsDays = days;
   document.querySelectorAll('.range-btn').forEach(function(b){ b.classList.toggle('active', +b.dataset.days === days); });
   document.getElementById('statsLoading').style.display = 'block';
   document.getElementById('statsData').style.display = 'none';
-  fetch(WORKER_URL + '/stats?days=' + days)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+  // 直连 GitHub（经 jsDelivr CDN，国内可达），前端按天聚合，绕过 Vercel Worker（国内不可达）
+  fetchStatsFromGitHub(days)
+    .then(function(results) {
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
-      currentStatsResults = data.results || [];
-      renderStatsData(currentStatsResults, days);
+      currentStatsResults = results;
+      renderStatsData(results, days);
     })
     .catch(function(e) {
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
-      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '</div>';
+      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '<br><span style="font-size:12px;opacity:.7">已尝试直连 GitHub 读取（Vercel Worker 国内不可达）</span></div>';
     });
+}
+
+/* 直接读 GitHub 上的 stats/*.json（经 jsDelivr CDN 加速，国内可达），前端按天聚合 */
+function fetchStatsFromGitHub(days) {
+  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/stats/';
+  var now = new Date();
+  var tasks = [];
+  for (var i = days - 1; i >= 0; i--) {
+    var d = new Date(now); d.setDate(now.getDate() - i);
+    var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    (function(dateStr) {
+      tasks.push(
+        fetch(CDN + dateStr + '.json?_=' + Date.now())
+          .then(function(r) { return r.ok ? r.json() : []; })
+          .then(function(arr) { return { date: dateStr, visits: Array.isArray(arr) ? arr : [] }; })
+          .catch(function() { return { date: dateStr, visits: [] }; })
+      );
+    })(ds);
+  }
+  return Promise.all(tasks);
 }
 
 function escapeHtml(s) {
