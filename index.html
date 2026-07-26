@@ -1102,6 +1102,78 @@ function toggleFormSection(el) {
   el.nextElementSibling.classList.toggle('open');
 }
 
+/* ===== 离线地址解析（自动拆分省/市/区县/乡镇，无需联网/定位） ===== */
+var PROVINCE_MAP = {
+  '北京市':'北京','天津市':'天津','上海市':'上海','重庆市':'重庆',
+  '河北省':'河北','山西省':'山西','辽宁省':'辽宁','吉林省':'吉林','黑龙江省':'黑龙江',
+  '江苏省':'江苏','浙江省':'浙江','安徽省':'安徽','福建省':'福建','江西省':'江西',
+  '山东省':'山东','河南省':'河南','湖北省':'湖北','湖南省':'湖南','广东省':'广东',
+  '海南省':'海南','四川省':'四川','贵州省':'贵州','云南省':'云南','陕西省':'陕西',
+  '甘肃省':'甘肃','青海省':'青海','台湾省':'台湾',
+  '内蒙古自治区':'内蒙古','广西壮族自治区':'广西','西藏自治区':'西藏',
+  '宁夏回族自治区':'宁夏','新疆维吾尔自治区':'新疆',
+  '香港特别行政区':'香港','澳门特别行政区':'澳门'
+};
+var PROVINCE_FULL = {
+  '北京':'北京市','天津':'天津市','上海':'上海市','重庆':'重庆市',
+  '河北':'河北省','山西':'山西省','辽宁':'辽宁省','吉林':'吉林省','黑龙江':'黑龙江省',
+  '江苏':'江苏省','浙江':'浙江省','安徽':'安徽省','福建':'福建省','江西':'江西省',
+  '山东':'山东省','河南':'河南省','湖北':'湖北省','湖南':'湖南省','广东':'广东省',
+  '海南':'海南省','四川':'四川省','贵州':'贵州省','云南':'云南省','陕西':'陕西省',
+  '甘肃':'甘肃省','青海':'青海省','台湾':'台湾省',
+  '内蒙古':'内蒙古自治区','广西':'广西壮族自治区','西藏':'西藏自治区',
+  '宁夏':'宁夏回族自治区','新疆':'新疆维吾尔自治区',
+  '香港':'香港特别行政区','澳门':'澳门特别行政区'
+};
+var MUNICIPAL = ['北京','天津','上海','重庆'];
+
+function parseAddress() {
+  var addrEl = document.getElementById('field_address');
+  var regionEl = document.getElementById('field_marketRegion');
+  if (!addrEl) return;
+  var raw = (addrEl.value || '').trim();
+  if (!raw) { showToast('请先在「省/市/区县/乡镇」框里粘贴完整地址'); return; }
+
+  var province = '', city = '', district = '', town = '';
+  /* 1) 识别省/直辖市/自治区/特别行政区：优先全称，再兜底简称 */
+  for (var full in PROVINCE_MAP) {
+    if (PROVINCE_MAP.hasOwnProperty(full) && raw.indexOf(full) >= 0) { province = PROVINCE_MAP[full]; break; }
+  }
+  if (!province) {
+    for (var full2 in PROVINCE_MAP) {
+      if (!PROVINCE_MAP.hasOwnProperty(full2)) continue;
+      var shortName = PROVINCE_MAP[full2];
+      if (raw.indexOf(shortName) >= 0) { province = shortName; break; }
+    }
+  }
+  /* 2) 识别市：省之后找第一个「XX市」 */
+  var rest = province ? raw.slice(raw.indexOf(province) + province.length) : raw;
+  var mCity = rest.match(/(.{2,10}?市)/);
+  if (mCity) { city = mCity[1].replace(/市$/, ''); }
+  /* 直辖市：市与省同名 */
+  if (MUNICIPAL.indexOf(province) >= 0) city = province;
+  /* 3) 识别区/县 */
+  var mDist = rest.match(/(.{2,10}?(?:区|县))/);
+  if (mDist) district = mDist[1];
+  /* 4) 识别镇/乡/街道 */
+  var mTown = rest.match(/(.{2,10}?(?:镇|乡|街道|街道办事处))/);
+  if (mTown) town = mTown[1];
+
+  /* 市场区域 = 省/市 */
+  var region = province ? (city && city !== province ? province + '/' + city : province) : city;
+  if (regionEl) regionEl.value = region || '';
+
+  /* 若地址缺省字头，补全省份全称便于阅读 */
+  if (province && raw.indexOf(province) < 0) {
+    addrEl.value = (PROVINCE_FULL[province] || province) + raw;
+  }
+
+  var statusEl = document.getElementById('locStatus');
+  if (statusEl) statusEl.textContent = '✅ 地址已离线解析，可手动修改';
+  var tail = (district ? ' · ' + district : '') + (town ? ' · ' + town : '');
+  showToast('✅ 已自动解析：' + (region || '未识别到省市') + tail);
+}
+
 /* ===== 手机定位 ===== */
 function getLocation() {
   var statusEl = document.getElementById('locStatus');
