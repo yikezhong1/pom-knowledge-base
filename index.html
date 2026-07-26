@@ -7,6 +7,7 @@
 <script src="marked.min.js"></script>
 <script src="purify.min.js"></script>
 <script src="fuse.min.js"></script>
+<script src="crypto-js.min.js"></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -502,7 +503,13 @@ function buildSearchIndex() {
     var cat = kbData.categories[catKey];
     function addDoc(f, subfolder) {
       if (!f.html) return;
-      var text = stripHtml(f.html);
+      var text;
+      if (f.encrypted) {
+        if (!masterKey) return; // 未解锁时不索引密文
+        try { text = stripHtml(decryptText(f.html, masterKey)); } catch (e) { return; }
+      } else {
+        text = stripHtml(f.html);
+      }
       if (text.length > 800) text = text.slice(0, 800);
       searchDocs.push({
         name: f.name, filename: f.filename,
@@ -539,7 +546,19 @@ var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 
 var PW_HASH = 'cG9tMjAyNg==';
 var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '08-生产工艺'];
 var unlocked = sessionStorage.getItem('pom_kb_unlocked') === '1';
+var masterKey = sessionStorage.getItem('pom_kb_master') || null;
 var pwCallback = null;
+
+/* 解密构建端加密的内容（与 build-static.js 使用相同 CryptoJS 参数） */
+function decryptText(payload, password) {
+  if (typeof payload !== 'string' || payload.indexOf('ENC:') !== 0) return payload;
+  var p = payload.split(':');
+  var salt = CryptoJS.enc.Hex.parse(p[1]);
+  var iv = CryptoJS.enc.Hex.parse(p[2]);
+  var key = CryptoJS.PBKDF2(password, salt, { keySize: 256 / 32, iterations: 10000 });
+  var d = CryptoJS.AES.decrypt(p[3], key, { iv: iv });
+  return d.toString(CryptoJS.enc.Utf8);
+}
 
 function isProtected(catKey) {
   for (var i = 0; i < PROTECTED_CATS.length; i++) {
@@ -560,11 +579,17 @@ function requireUnlock(catKey, callback) {
 
 function confirmPw() {
   var val = document.getElementById('pwInput').value;
-  if (btoa(val) === PW_HASH) {
+  if (!val) { document.getElementById('pwError').style.display = 'block'; return; }
+  var probeClear;
+  try { probeClear = decryptText(kbData.probe, val); } catch (e) { probeClear = ''; }
+  if (probeClear === 'POM_PROBE_OK') {
     unlocked = true;
+    masterKey = val;
     sessionStorage.setItem('pom_kb_unlocked', '1');
+    sessionStorage.setItem('pom_kb_master', val);
     document.getElementById('pwOverlay').classList.remove('show');
     renderSidebar(document.getElementById('searchInput').value.trim());
+    buildSearchIndex();
     if (pwCallback) { pwCallback(); pwCallback = null; }
     showToast('验证成功');
   } else {
@@ -1006,7 +1031,12 @@ function openFile(category, filename, subfolder) {
   var modDate = new Date(file.modified).toLocaleString('zh-CN');
   var sizeKB = (file.size / 1024).toFixed(1);
   var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
-  content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(file.html.indexOf('md-content') >= 0 ? file.html : '<div class="md-content">' + file.html + '</div>');
+  var htmlToRender = file.html;
+  if (file.encrypted) {
+    try { htmlToRender = decryptText(file.html, masterKey); }
+    catch (e) { htmlToRender = '<p style="color:#ef4444">解密失败，请重新输入密码后重试。</p>'; }
+  }
+  content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(htmlToRender.indexOf('md-content') >= 0 ? htmlToRender : '<div class="md-content">' + htmlToRender + '</div>');
   content.scrollTop = 0;
   if (window.innerWidth <= 768) closeSidebar();
 }
