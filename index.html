@@ -473,6 +473,7 @@ body {
 </div>
 <script>
 var kbData = null;
+var loadedCats = {};
 var customersData = null;
 var currentFile = null;
 var openCats = new Set();
@@ -502,15 +503,9 @@ function buildSearchIndex() {
   for (var catKey in kbData.categories) {
     var cat = kbData.categories[catKey];
     function addDoc(f, subfolder) {
-      if (!f.html) return;
-      var text;
-      if (f.encrypted) {
-        if (!masterKey) return; // 未解锁时不索引密文
-        try { text = stripHtml(decryptText(f.html, masterKey)); } catch (e) { return; }
-      } else {
-        text = stripHtml(f.html);
-      }
-      if (text.length > 800) text = text.slice(0, 800);
+      if (f.encrypted && !masterKey) return; // 未解锁时不索引敏感分类（含摘要）
+      var text = f.excerpt || '';
+      if (text.length > 200) text = text.slice(0, 200);
       searchDocs.push({
         name: f.name, filename: f.filename,
         category: catKey, catLabel: cat.label, catIcon: cat.icon,
@@ -721,10 +716,24 @@ window.addEventListener('hashchange', function() {
   }
 });
 
+async function ensureCategory(catKey) {
+  if (loadedCats[catKey] || !kbData || !kbData.categories || !kbData.categories[catKey]) return;
+  try {
+    var res = await fetch('cat-' + encodeURIComponent(catKey) + '.json');
+    if (!res.ok) return;
+    var d = await res.json();
+    var cat = kbData.categories[catKey];
+    cat.files = d.files;
+    cat.subfolders = d.subfolders;
+    loadedCats[catKey] = true;
+  } catch (e) {}
+}
+
 async function init() {
   try {
-    var res = await fetch('data.json');
+    var res = await fetch('data-index.json');
     kbData = await res.json();
+    loadedCats = {};
     buildSearchIndex();
     renderSidebar();
     if (!navigateFromHash()) showWelcome();
@@ -741,8 +750,9 @@ async function init() {
 
 async function refreshData() {
   try {
-    var res = await fetch('data.json?t=' + Date.now());
+    var res = await fetch('data-index.json?t=' + Date.now());
     kbData = await res.json();
+    loadedCats = {};
     await loadCustomers();
     mergeCustomers();
     buildSearchIndex();
@@ -1007,11 +1017,12 @@ function findFileInCat(cat, filename, subfolder) {
   return null;
 }
 
-function openFile(category, filename, subfolder) {
+async function openFile(category, filename, subfolder) {
   if (isProtected(category) && !unlocked) {
     requireUnlock(category, function() { openFile(category, filename, subfolder); });
     return;
   }
+  await ensureCategory(category);
   currentFile = { category: category, filename: filename, subfolder: subfolder || '' };
   /* 更新 URL 哈希，支持分享/收藏/前进后退 */
   var hashPath = '#/' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
@@ -1859,7 +1870,8 @@ function onCatCardClick(catKey) {
   showCategoryPage(catKey);
 }
 
-function showCategoryPage(catKey) {
+async function showCategoryPage(catKey) {
+  await ensureCategory(catKey);
   var cat = kbData.categories[catKey];
   if (!cat) return;
   currentFile = null;
