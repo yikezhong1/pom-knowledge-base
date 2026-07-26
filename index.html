@@ -6,7 +6,7 @@
 <title>POM 聚甲醛知识库</title>
 <script src="marked.min.js"></script>
 <script src="purify.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/7.0.0/fuse.min.js"></script>
+<script src="fuse.min.js"></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -333,8 +333,20 @@ body {
 .form-reset { background: #f1f5f9; color: var(--text-secondary); }
 .form-reset:hover { background: #e2e8f0; }
 .form-note { font-size: 12px; color: var(--text-secondary); margin-top: 12px; line-height: 1.6; }
+.menu-btn { display: none; align-items: center; justify-content: center; width: 38px; height: 38px; margin-right: 8px; border: none; background: transparent; color: var(--text-primary); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 8px; flex-shrink: 0; }
+.menu-btn:hover { background: var(--bg-sidebar-hover); }
+.sidebar-mask { display: none; }
 @media (max-width: 768px) {
-  .sidebar { width: 260px; min-width: 260px; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+    width: 280px; min-width: 280px;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,.25);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-mask { display: none; position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.45); }
+  .sidebar-mask.show { display: block; }
+  .menu-btn { display: inline-flex; }
   .content-wrap { padding: 16px; }
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
   .form-row { grid-template-columns: 1fr; }
@@ -393,8 +405,10 @@ body {
   </div>
   <div class="file-list" id="fileList"></div>
 </div>
+<div class="sidebar-mask" id="sidebarMask" onclick="toggleSidebar()"></div>
 <div class="main">
   <div class="topbar">
+    <button class="menu-btn" onclick="toggleSidebar()" aria-label="菜单">☰</button>
     <div class="breadcrumb" id="breadcrumb">知识库首页</div>
     <div class="topbar-actions" id="topbarActions"></div>
   </div>
@@ -614,7 +628,7 @@ var FORM_SECTIONS = [
   ]},
   { title: '位置信息', icon: '📍', fields: [
     { key: 'marketRegion', label: '市场区域（省/市）', type: 'text', placeholder: '如：广东/东莞' },
-    { key: 'address', label: '省/市/区县/乡镇', type: 'text', placeholder: '填写详细地址' },
+    { key: 'address', label: '省/市/区县/乡镇', type: 'textarea', placeholder: '粘贴客户完整地址，如：广东省东莞市松山湖镇工业北路8号' },
     { key: 'coordinates', label: '经纬度', type: 'text', placeholder: '如：22.54,113.75' }
   ]},
   { title: '联系人信息', icon: '👤', fields: [
@@ -772,6 +786,26 @@ function goHome() {
   if (location.hash) location.hash = '';
   refreshData();
   showWelcome();
+}
+
+/* ===== 移动端抽屉 ===== */
+function toggleSidebar() {
+  var sb = document.querySelector('.sidebar');
+  var mask = document.getElementById('sidebarMask');
+  if (!sb || !mask) return;
+  if (sb.classList.contains('open')) {
+    sb.classList.remove('open');
+    mask.classList.remove('show');
+  } else {
+    sb.classList.add('open');
+    mask.classList.add('show');
+  }
+}
+function closeSidebar() {
+  var sb = document.querySelector('.sidebar');
+  var mask = document.getElementById('sidebarMask');
+  if (sb) sb.classList.remove('open');
+  if (mask) mask.classList.remove('show');
 }
 
 /* ===== 侧边栏 ===== */
@@ -974,6 +1008,7 @@ function openFile(category, filename, subfolder) {
   var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
   content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(file.html.indexOf('md-content') >= 0 ? file.html : '<div class="md-content">' + file.html + '</div>');
   content.scrollTop = 0;
+  if (window.innerWidth <= 768) closeSidebar();
 }
 
 /* ===== 在线填报表单 ===== */
@@ -1011,7 +1046,11 @@ function showCustomerForm() {
         }
         html += '</select>';
       } else if (field.type === 'textarea') {
-        html += '<textarea id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '"></textarea>';
+        html += '<textarea id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '" style="min-height:64px"></textarea>';
+        if (field.key === 'address') {
+          html += '<button type="button" class="loc-btn loc-btn-blue" style="margin-top:8px" onclick="parseAddress()">🪄 自动解析地址</button>';
+          html += '<div class="loc-map-tip" style="margin-top:6px">粘贴完整地址后点「自动解析」，离线自动拆分省/市/区县/乡镇并填好上方市场区域，无需联网、不依赖定位。</div>';
+        }
       } else {
         html += '<input type="text" id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '">';
       }
@@ -1435,7 +1474,11 @@ function showCustomerEditForm(index) {
         }
         html += '</select>';
       } else if (field.type === 'textarea') {
-        html += '<textarea id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '">' + escapedVal + '</textarea>';
+        html += '<textarea id="field_' + field.key + '" placeholder="' + (field.placeholder || '') + '" style="min-height:64px">' + escapedVal + '</textarea>';
+        if (field.key === 'address') {
+          html += '<button type="button" class="loc-btn loc-btn-blue" style="margin-top:8px" onclick="parseAddress()">🪄 自动解析地址</button>';
+          html += '<div class="loc-map-tip" style="margin-top:6px">粘贴完整地址后点「自动解析」，离线自动拆分省/市/区县/乡镇并填好上方市场区域，无需联网、不依赖定位。</div>';
+        }
       } else {
         html += '<input type="text" id="field_' + field.key + '" value="' + escapedVal + '" placeholder="' + (field.placeholder || '') + '">';
       }
