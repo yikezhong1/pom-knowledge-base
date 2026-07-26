@@ -523,7 +523,7 @@ var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 
 
 /* ===== 密码保护 ===== */
 var PW_HASH = 'cG9tMjAyNg==';
-var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '07-工作模板', '08-生产工艺'];
+var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '08-生产工艺'];
 var unlocked = sessionStorage.getItem('pom_kb_unlocked') === '1';
 var pwCallback = null;
 
@@ -1572,7 +1572,7 @@ function showWelcome() {
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="welcome">'
     + '<h2>POM 聚甲醛知识库</h2>'
-    + '<p>涵盖基础知识、产品知识、换料案例、销售话术、行情资讯等全方位业务资料</p>'
+    + '<p>涵盖基础知识、产品知识、销售话术、行情资讯等全方位业务资料</p>'
     + '<div class="home-search">'
     + '<div class="search-tabs"><button class="search-tab active" onclick="switchSearchTab(\'local\',this)">站内</button><button class="search-tab" onclick="switchSearchTab(\'web\',this)">站外</button></div>'
     + '<div class="home-search-row"><span class="search-icon">🔍</span><input type="text" id="homeSearchInput" placeholder="搜索知识库内容..." oninput="onHomeSearch(this.value)" onkeydown="if(event.key===\'Enter\'&&searchMode===\'web\')doWebSearch(this.value)"><button class="web-search-btn" id="webSearchBtn" onclick="doWebSearch(document.getElementById(\'homeSearchInput\').value)">搜索</button></div>'
