@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POM 聚甲醛知识库</title>
-<script src="marked.min.js"></script>
-<script src="purify.min.js"></script>
-<script src="fuse.min.js"></script>
-<script src="crypto-js.min.js"></script>
+<script src="marked.min.js" defer></script>
+<script src="purify.min.js" defer></script>
+<script src="fuse.min.js" defer></script>
+<script src="crypto-js.min.js" defer></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -725,11 +725,15 @@ async function init() {
   try {
     var res = await fetch('data.json');
     kbData = await res.json();
-    await loadCustomers();
-    mergeCustomers();
     buildSearchIndex();
     renderSidebar();
     if (!navigateFromHash()) showWelcome();
+    /* 客户档案异步加载（jsDelivr 国内偶发慢），不阻塞首屏；返回后合并并刷新 */
+    loadCustomers().then(function() {
+      mergeCustomers();
+      buildSearchIndex();
+      renderSidebar();
+    }).catch(function() {});
   } catch (e) {
     document.getElementById('contentWrap').innerHTML = '<div class="pdf-notice"><div class="icon">⚠️</div><p>加载失败: ' + e.message + '</p></div>';
   }
@@ -1946,7 +1950,7 @@ function showToast(msg) {
   setTimeout(function() { el.classList.remove('show'); }, 2500);
 }
 
-init();
+document.addEventListener('DOMContentLoaded', init);
 
 /* ===== 访问统计（静默采集 + GitHub存储） ===== */
 var STATS_REPORT_ENABLED = true; // 写侧已迁至阿里云 FC（国内可达），恢复访客上报与 IP 采集
