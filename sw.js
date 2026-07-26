@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pom-kb-20260726';
+var CACHE_NAME = 'pom-kb-202607262042';
 var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'data.json'];
 
 self.addEventListener('install', function(event) {
@@ -23,6 +23,26 @@ self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET' || url.indexOf(self.location.origin) !== 0) return;
   /* customers.json 不缓存（实时数据） */
   if (url.indexOf('customers.json') >= 0) return;
+
+  /* 导航页(index.html)与数据(data.json)：联网优先，确保每次都拿到最新版；离线才用缓存 */
+  var isNav = event.request.mode === 'navigate' || url.indexOf('index.html') >= 0 || url.slice(-1) === '/';
+  var isData = url.indexOf('data.json') >= 0;
+  if (isNav || isData) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        if (response && response.status === 200) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
+        }
+        return response;
+      }).catch(function() {
+        return caches.match(event.request).then(function(c) { return c || fetch(event.request); });
+      })
+    );
+    return;
+  }
+
+  /* 静态资源(JS库等)：缓存优先，后台更新（stale-while-revalidate） */
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       var fetchPromise = fetch(event.request).then(function(response) {
@@ -32,7 +52,6 @@ self.addEventListener('fetch', function(event) {
         }
         return response;
       }).catch(function() { return cached; });
-      /* 优先返回缓存，后台更新（stale-while-revalidate） */
       return cached || fetchPromise;
     })
   );
