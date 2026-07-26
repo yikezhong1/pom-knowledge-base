@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pom-kb-202607270031';
+var CACHE_NAME = 'pom-kb-202607270046';
 var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'data.json'];
 
 self.addEventListener('install', function(event) {
