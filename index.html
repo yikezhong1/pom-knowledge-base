@@ -672,7 +672,7 @@ function navigateFromHash() {
   if (!kbData || !kbData.categories || !kbData.categories[category]) return false;
   var file = findFileInCat(kbData.categories[category], filename, subfolder);
   if (!file) return false;
-  openFile(category, filename, subfolder ? encodeURIComponent(subfolder) : '');
+  openFile(category, filename, subfolder);
   return true;
 }
 window.addEventListener('hashchange', function() {
