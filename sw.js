@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pom-kb-202607270018';
+var CACHE_NAME = 'pom-kb-202607270031';
 var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'data.json'];
 
 self.addEventListener('install', function(event) {
@@ -24,10 +24,27 @@ self.addEventListener('fetch', function(event) {
   /* customers.json 不缓存（实时数据） */
   if (url.indexOf('customers.json') >= 0) return;
 
-  /* 导航页(index.html)与数据(data.json)：联网优先，确保每次都拿到最新版；离线才用缓存 */
-  var isNav = event.request.mode === 'navigate' || url.indexOf('index.html') >= 0 || url.slice(-1) === '/';
+  /* 数据(data.json)：先给旧缓存、后台更新 → 复访秒开（最大文件，提速关键） */
   var isData = url.indexOf('data.json') >= 0;
-  if (isNav || isData) {
+  if (isData) {
+    event.respondWith(
+      caches.match(event.request).then(function(cached) {
+        var fetchPromise = fetch(event.request).then(function(response) {
+          if (response && response.status === 200) {
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
+          }
+          return response;
+        }).catch(function() { return cached; });
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  /* 导航页(index.html)：联网优先，确保新版本 Service Worker 正常激活 */
+  var isNav = event.request.mode === 'navigate' || url.indexOf('index.html') >= 0 || url.slice(-1) === '/';
+  if (isNav) {
     event.respondWith(
       fetch(event.request).then(function(response) {
         if (response && response.status === 200) {
