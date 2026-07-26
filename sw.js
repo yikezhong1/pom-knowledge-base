@@ -1,5 +1,6 @@
-var CACHE_NAME = 'pom-kb-202607270046';
-var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'data.json'];
+var CACHE_NAME = 'pom-kb-202607270118';
+/* 预缓存骨架：导航页 + JS 库。数据文件(data-index.json / cat-*.json)走运行时懒加载缓存 */
+var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'fuse.min.js', 'crypto-js.min.js'];
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
@@ -17,28 +18,31 @@ self.addEventListener('activate', function(event) {
   );
 });
 
+function staleWhileRevalidate(request) {
+  return caches.match(request).then(function(cached) {
+    var fetchPromise = fetch(request).then(function(response) {
+      if (response && response.status === 200) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+      }
+      return response;
+    }).catch(function() { return cached; });
+    return cached || fetchPromise;
+  });
+}
+
 self.addEventListener('fetch', function(event) {
   var url = event.request.url;
-  /* 只缓存同源GET请求 */
+  /* 只缓存同源 GET 请求 */
   if (event.request.method !== 'GET' || url.indexOf(self.location.origin) !== 0) return;
-  /* customers.json 不缓存（实时数据） */
+  /* customers.json 不缓存（实时客户数据，绝不走缓存/不覆盖） */
   if (url.indexOf('customers.json') >= 0) return;
 
-  /* 数据(data.json)：先给旧缓存、后台更新 → 复访秒开（最大文件，提速关键） */
-  var isData = url.indexOf('data.json') >= 0;
-  if (isData) {
-    event.respondWith(
-      caches.match(event.request).then(function(cached) {
-        var fetchPromise = fetch(event.request).then(function(response) {
-          if (response && response.status === 200) {
-            var clone = response.clone();
-            caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
-          }
-          return response;
-        }).catch(function() { return cached; });
-        return cached || fetchPromise;
-      })
-    );
+  var isDataIndex = url.indexOf('data-index.json') >= 0;
+  var isCat = /\/cat-[^/]+\.json(\?|$)/.test(url);
+  /* 懒加载数据文件(data-index / cat-*)：先给旧缓存、后台更新 → 复访秒开 */
+  if (isDataIndex || isCat) {
+    event.respondWith(staleWhileRevalidate(event.request));
     return;
   }
 
@@ -59,17 +63,6 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  /* 静态资源(JS库等)：缓存优先，后台更新（stale-while-revalidate） */
-  event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      var fetchPromise = fetch(event.request).then(function(response) {
-        if (response && response.status === 200) {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, clone); });
-        }
-        return response;
-      }).catch(function() { return cached; });
-      return cached || fetchPromise;
-    })
-  );
+  /* 静态资源(JS 库等)：缓存优先，后台更新（stale-while-revalidate） */
+  event.respondWith(staleWhileRevalidate(event.request));
 });
