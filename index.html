@@ -1108,8 +1108,8 @@ function showCustomerForm() {
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
-  /* 初始化地图并自动获取手机位置（需用户授权） */
-  setTimeout(function() { initLocationMap(35.86, 104.19, 4); getLocation(); }, 300);
+  /* 初始化地图（本地库，手机必可达）；定位改为点击「获取当前位置」按钮触发，避免一进页面弹权限被忽略 */
+  setTimeout(function() { initLocationMap(35.86, 104.19, 4); }, 300);
 }
 
 function toggleFormSection(el) {
@@ -1284,12 +1284,16 @@ function loadLeaflet(callback) {
   if (mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:13px">🗺️ 地图加载中...</div>';
   var css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = 'https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+  css.href = 'lib/leaflet/leaflet.min.css';
   document.head.appendChild(css);
   var script = document.createElement('script');
-  script.src = 'https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-  script.onload = function() { leafletLoaded = true; callback(); };
-  script.onerror = function() { if (mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:13px">地图加载失败，请检查网络后刷新重试</div>'; };
+  script.src = 'lib/leaflet/leaflet.min.js';
+  script.onload = function() {
+    leafletLoaded = true;
+    try { if (window.L && L.Icon && L.Icon.Default) { L.Icon.Default.mergeOptions({ iconRetinaUrl: 'lib/leaflet/images/marker-icon-2x.png', iconUrl: 'lib/leaflet/images/marker-icon.png', shadowUrl: 'lib/leaflet/images/marker-shadow.png' }); } } catch(e) {}
+    callback();
+  };
+  script.onerror = function() { if (mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:13px">地图组件加载失败，请刷新重试，或改用「自动解析地址」离线填写</div>'; };
   document.head.appendChild(script);
 }
 
@@ -1311,6 +1315,7 @@ function initLocationMap(lat, lng, zoom) {
     L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
       subdomains: '1234',
       maxZoom: 18,
+      errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
       attribution: '&copy; 高德地图'
     }).addTo(locationMap);
     locationMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMap);
