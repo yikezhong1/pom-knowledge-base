@@ -1048,8 +1048,9 @@ async function openFile(category, filename, subfolder) {
   document.getElementById('breadcrumb').innerHTML = breadPath;
   var actions = document.getElementById('topbarActions');
   if (file.ext === 'pdf') {
-    actions.innerHTML = '';
-    content.innerHTML = '<div class="pdf-notice"><div class="icon">📄</div><p>这是一个 PDF 文件</p><p style="margin-top:8px;font-size:13px;color:#94a3b8">PDF 文件不支持在线预览</p></div>';
+    var pdfUrl = './' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
+    actions.innerHTML = '<a class="pdf-dl-btn" href="' + pdfUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:6px 14px;border-radius:8px;background:var(--accent,#2563eb);color:#fff;text-decoration:none;font-size:13px;font-weight:600;">打开 / 下载 PDF</a>';
+    content.innerHTML = '<div class="pdf-notice"><div class="icon">📄</div><p>这是 PDF 文件：' + file.name + '</p><p style="margin-top:8px;font-size:13px;color:#94a3b8">点击右上角「打开 / 下载 PDF」查看完整内容（含效果图、示意图）。</p></div>';
     return;
   }
   actions.innerHTML = '<button onclick="copyContent()">复制内容</button>';
