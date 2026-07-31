@@ -763,16 +763,26 @@ async function refreshData() {
 
 /* ===== customers.json 加载与合并 ===== */
 async function loadCustomers() {
-  // 直连 GitHub（经 jsDelivr CDN，国内可达），绕过 Vercel Worker（国内不可达）
-  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/customers.json?_=' + Date.now();
+  // 优先走阿里云函数计算：与提交同源，无 CDN 缓存延迟，新增客户即时可见
   try {
-    var res = await fetch(CDN);
+    var res = await fetch(WORKER_URL + '/customers');
     if (res.ok) {
       customersData = await res.json() || { records: [] };
       return;
     }
   } catch (e) {
-    console.warn('jsDelivr 读取客户档案失败', e);
+    console.warn('阿里云FC读取客户档案失败，回退 jsDelivr', e);
+  }
+  // 兜底：jsDelivr CDN 直连 GitHub（国内可达，但存在缓存延迟，可能读不到刚新增的客户）
+  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/customers.json?_=' + Date.now();
+  try {
+    var res2 = await fetch(CDN);
+    if (res2.ok) {
+      customersData = await res2.json() || { records: [] };
+      return;
+    }
+  } catch (e2) {
+    console.warn('jsDelivr 读取客户档案失败', e2);
   }
   customersData = { records: [] };
 }
@@ -2229,5 +2239,51 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function() {});
 }
 </script>
+<!-- 网页截图功能 -->
+<script src="html2canvas.min.js"></script>
+<script>
+(function(){
+  var b=document.createElement('button');
+  b.id='pom-shot-btn';b.innerHTML='📷';b.title='截取整个页面为图片';
+  b.style.cssText='position:fixed;right:16px;bottom:16px;z-index:999999;width:50px;height:50px;border-radius:50%;border:none;background:rgba(37,99,235,0.92);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;transition:transform .2s,opacity .2s;line-height:1;padding:0';
+  b.onmouseenter=function(){b.style.transform='scale(1.12)'};
+  b.onmouseleave=function(){b.style.transform='scale(1)'};
+  document.body.appendChild(b);
+  b.addEventListener('click',function(){
+    if(b.dataset.busy==='1')return;
+    b.dataset.busy='1';b.style.opacity='.4';
+    var o=b.innerHTML;b.innerHTML='⏳';b.style.display='none';
+    var targets=[document.body,document.querySelector('.main'),document.querySelector('.content-wrap'),document.querySelector('.sidebar')].filter(Boolean);
+    var saved=targets.map(function(el){return{el:el,ov:el.style.overflow,h:el.style.height,mh:el.style.maxHeight}});
+    targets.forEach(function(el){el.style.overflow='visible';el.style.height='auto';el.style.maxHeight='none'});
+    var cw=document.querySelector('.content-wrap');if(cw)cw.scrollTop=0;
+    window.scrollTo(0,0);
+    var fix=document.createElement('style');fix.id='pom-shot-fix';fix.textContent='*{-webkit-background-clip:border-box!important;-webkit-text-fill-color:initial!important}';document.head.appendChild(fix);
+    setTimeout(function(){
+      html2canvas(document.body,{useCORS:true,scrollX:0,scrollY:0,
+        width:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth),
+        height:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),
+        windowWidth:document.documentElement.scrollWidth,
+        windowHeight:document.documentElement.scrollHeight,
+        backgroundColor:null
+      }).then(function(c){
+        saved.forEach(function(s){s.el.style.overflow=s.ov;s.el.style.height=s.h;s.el.style.maxHeight=s.mh});
+        document.head.removeChild(fix);
+        var a=document.createElement('a');
+        a.download=(document.title||'screenshot').replace(/[\\/:*?"<>|]/g,'_')+'.png';
+        a.href=c.toDataURL('image/png');a.click();
+      }).catch(function(e){
+        saved.forEach(function(s){s.el.style.overflow=s.ov;s.el.style.height=s.h;s.el.style.maxHeight=s.mh});
+        document.head.removeChild(fix);
+        alert('截图失败：'+e.message);
+      }).then(function(){
+        b.style.display='';b.innerHTML=o;b.style.opacity='';b.dataset.busy='0';
+      });
+    },150);
+  });
+})();
+</script>
+
+
 </body>
 </html>
