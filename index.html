@@ -467,6 +467,14 @@ function safeHtml(html) {
   return html;
 }
 
+/* HTML 实体转义：所有拼进 innerHTML 的动态文本（尤其是来自 customers.json 的客户字段）
+   都必须经过这里，防止存储型 XSS。2026-08-01 从文件末尾移到顶部，避免依赖函数提升。 */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
 /* ===== 全文搜索索引 ===== */
 var searchDocs = [];
 var fuseInstance = null;
@@ -665,13 +673,21 @@ async function ensureCategory(catKey) {
   if (loadedCats[catKey] || !kbData || !kbData.categories || !kbData.categories[catKey]) return;
   try {
     var res = await fetch('cat-' + encodeURIComponent(catKey) + '.json');
-    if (!res.ok) return;
+    if (!res.ok) {
+      /* 2026-08-01 整改：原先静默 return，分类打不开时页面一片空白、用户无从判断 */
+      console.warn('分类内容加载失败 HTTP ' + res.status + ' : ' + catKey);
+      showToast('「' + catKey.replace(/^\d+-/, '') + '」内容加载失败，请检查网络后刷新');
+      return;
+    }
     var d = await res.json();
     var cat = kbData.categories[catKey];
     cat.files = d.files;
     cat.subfolders = d.subfolders;
     loadedCats[catKey] = true;
-  } catch (e) {}
+  } catch (e) {
+    console.warn('分类内容加载异常：' + catKey, e);
+    showToast('「' + catKey.replace(/^\d+-/, '') + '」内容加载失败，请检查网络后刷新');
+  }
 }
 
 async function init() {
@@ -1436,7 +1452,18 @@ function showCustomerTable() {
     html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + records.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody id="custTableBody">';
     for (var i = 0; i < records.length; i++) {
       var rec = records[i];
-      html += '<tr data-idx="' + i + '" data-search="' + ((rec.customerName || '') + (rec.businessManager || '') + (rec.agent || '')).toLowerCase() + '" onclick="showCustomerDetail(' + i + ')"><td class="ct-idx">' + (i + 1) + '</td><td>' + (rec.businessManager || '') + '</td><td class="ct-name">' + (rec.customerName || '') + '</td><td>' + (rec.dealStatus || '') + '</td><td>' + (rec.customerType || '') + '</td><td>' + (rec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
+      /* 2026-08-01 安全整改：所有客户字段（来自 customers.json，可经 API 写入）全部走 escapeHtml，
+         含 data-search 属性值，防止存储型 XSS 与属性注入 */
+      var searchAttr = escapeHtml(((rec.customerName || '') + (rec.businessManager || '') + (rec.agent || '')).toLowerCase());
+      html += '<tr data-idx="' + i + '" data-search="' + searchAttr + '" onclick="showCustomerDetail(' + i + ')">'
+            + '<td class="ct-idx">' + (i + 1) + '</td>'
+            + '<td>' + escapeHtml(rec.businessManager || '') + '</td>'
+            + '<td class="ct-name">' + escapeHtml(rec.customerName || '') + '</td>'
+            + '<td>' + escapeHtml(rec.dealStatus || '') + '</td>'
+            + '<td>' + escapeHtml(rec.customerType || '') + '</td>'
+            + '<td>' + escapeHtml(rec.agent || '') + '</td>'
+            + '<td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button>'
+            + '<button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
     }
     html += '</tbody></table></div>';
   }
@@ -1459,7 +1486,7 @@ function showCustomerDetail(index) {
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) return;
-  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + (rec.customerName || '') + '</span>';
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + escapeHtml(rec.customerName || '') + '</span>';
   document.getElementById('topbarActions').innerHTML = '<button onclick="editCustomer(' + index + ')">✏️ 编辑</button><button onclick="showCustomerTable()">返回列表</button>';
   document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + safeHtml(marked.parse(generateCustomerMd(rec))) + '</div>';
   document.getElementById('contentWrap').scrollTop = 0;
@@ -1540,9 +1567,9 @@ function showCustomerEditForm(index) {
   pendingEditIndex = index;
   currentFile = null;
   renderSidebar();
-  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 编辑客户 / <span>' + (rec.customerName || '') + '</span>';
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 编辑客户 / <span>' + escapeHtml(rec.customerName || '') + '</span>';
   document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">返回列表</button>';
-  var html = '<div class="form-page"><div class="form-header"><div class="form-icon">✏️</div><div><div class="form-title">编辑客户档案</div><div class="form-desc">修改客户「' + (rec.customerName || '') + '」的信息后保存</div></div></div>';
+  var html = '<div class="form-page"><div class="form-header"><div class="form-icon">✏️</div><div><div class="form-title">编辑客户档案</div><div class="form-desc">修改客户「' + escapeHtml(rec.customerName || '') + '」的信息后保存</div></div></div>';
   for (var s = 0; s < FORM_SECTIONS.length; s++) {
     var section = FORM_SECTIONS[s];
     var isOpen = s === 0 || section.title === '位置信息';
@@ -1558,7 +1585,7 @@ function showCustomerEditForm(index) {
       var field = fields[f];
       var isFull = field.type === 'textarea';
       var val = rec[field.key] || '';
-      var escapedVal = val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      var escapedVal = escapeHtml(val);   /* 2026-08-01：统一走 escapeHtml（原手写转义漏了单引号） */
       html += '<div class="form-row' + (isFull ? ' full' : '') + '"><div class="form-field">';
       html += '<label>' + field.label + (field.required ? '<span class="req">*</span>' : '') + '</label>';
       if (field.type === 'select') {
@@ -1951,17 +1978,11 @@ function trackVisit() {
     device: device, os: os, browser: browser,
     screen: screen.width + 'x' + screen.height,
     lang: navigator.language || '',
-    referrer: document.referrer || '直接访问',
-    ip: '', location: ''
+    referrer: document.referrer || '直接访问'
   };
-  fetchVisitIp().then(function(ipInfo) {
-    if (ipInfo && ipInfo.ip) {
-      // 末端打码：保留前3段 + 归属地，兼顾地域分析与隐私合规
-      visit.ip = ipInfo.ip.replace(/\.\d+$/, '.');  // 对齐 Qoder 原方案：末段打码为 113.108.145.（尾点）
-      visit.location = ipInfo.location || '';
-    }
-    saveVisit(visit);
-  });
+  /* 2026-08-01 整改：已移除访客 IP / 归属地采集（JSONP 成功率仅 3%，且涉及隐私），
+     直接上报设备维度即可，少一次跨域请求，首屏更快 */
+  saveVisit(visit);
 }
 
 function saveVisit(visit) {
@@ -1972,33 +1993,10 @@ function saveVisit(visit) {
   }).catch(function(e) { console.log('stats save error:', e); });
 }
 
-/* 通过国内 JSONP 接口获取访客公网 IP 与归属地（绕过境外服务被墙 + 跨域限制） */
-function fetchVisitIp() {
-  return new Promise(function(resolve) {
-    var to;
-    function finish(v) { clearTimeout(to); resolve(v); }
-    try {
-      var s = document.createElement('script');
-      var cbName = 'pom_ip_cb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
-      var done = false;
-      window[cbName] = function(d) {
-        if (done) return; done = true;
-        try { document.body.removeChild(s); } catch (e) {}
-        try { delete window[cbName]; } catch (e) {}
-        var ip = (d && d.ip ? String(d.ip) : '').trim();
-        var loc = [d && d.pro, d && d.city, d && d.addr].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-        finish({ ip: ip, location: loc });
-      };
-      s.charset = 'GBK';
-      s.src = 'https://whois.pconline.com.cn/ipJson.jsp?callback=' + cbName;
-      s.onerror = function() { if (!done) { done = true; finish({ ip: '', location: '' }); } };
-      to = setTimeout(function() { if (!done) { done = true; finish({ ip: '', location: '' }); } }, 5000);
-      document.body.appendChild(s);
-    } catch (e) {
-      finish({ ip: '', location: '' });
-    }
-  });
-}
+/* 2026-08-01 整改：fetchVisitIp() 已整体删除
+   原方案通过 whois.pconline.com.cn JSONP 取访客 IP 与归属地，实测 14 天 87 次访问仅 3 次成功（3%），
+   失败原因：响应 Content-Type 为 text/html;charset=GBK 非 JS 类型、script.charset 属性已废弃、
+   隐私插件普遍拦截第三方脚本。功能价值极低且涉及访客隐私，按教授指示整体移除。 */
 
 function openStats() { document.getElementById('statsOverlay').classList.add('show'); loadStats(); }
 function closeStats() { document.getElementById('statsOverlay').classList.remove('show'); }
@@ -2015,7 +2013,8 @@ function loadStats(days, realtime) {
   var useRealtime = !!realtime;
   var reqDays = days;
   var clamped = false;
-  if (useRealtime && days > 30) { reqDays = 30; clamped = true; } // FC 实时接口上限 30 天
+  /* 2026-08-01 整改：实时模式改为「近7天走FC + 更早走CDN」混合拉取，任意天数均不再超时，
+     故取消原先"超过30天强制截断"的限制，近90天也能完整显示 */
   document.getElementById('statsLoading').style.display = 'block';
   document.getElementById('statsLoading').textContent = useRealtime ? '正在从服务器拉取实时数据...' : '加载统计数据中...';
   document.getElementById('statsData').style.display = 'none';
@@ -2043,7 +2042,7 @@ function loadStats(days, realtime) {
       document.getElementById('statsLoading').style.display = 'none';
       document.getElementById('statsData').style.display = 'block';
       if (rtBtn) { rtBtn.disabled = false; rtBtn.textContent = '🔄 拉取实时数据'; }
-      var tip = useRealtime ? '实时接口请求失败，请稍后重试或改用默认（CDN）模式' : '已尝试经 jsDelivr CDN 读取（Vercel Worker 国内不可达）';
+      var tip = useRealtime ? '实时接口请求失败，请稍后重试，或直接切换时间范围按钮走 CDN 模式' : '已尝试经 jsDelivr CDN 读取，请检查网络后重试';
       document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '<br><span style="font-size:12px;opacity:.7">' + tip + '</span></div>';
     });
 }
@@ -2068,24 +2067,56 @@ function fetchStatsFromGitHub(days) {
   return Promise.all(tasks);
 }
 
-/* 实时读取：直连阿里云 FC（绕过 CDN 缓存），FC 返回 {results:[{date,visits}]}（今天在前）；
-   reverse 成 旧→新 顺序，与 jsDelivr 版保持一致，供 renderStatsData 复用 */
-function fetchStatsFromFC(days) {
+/* ===== 实时读取（2026-08-01 重构，治本修复"近30天/近90天必报502"）=====
+   问题根因：阿里云 FC 的 /stats?days=N 按天串行拉 GitHub 上的 stats/YYYY-MM-DD.json，
+             耗时随 N 线性增长（实测 7天=4.5s、14天=9.3s、20天起必 502），函数网关约 10s 超时硬截断。
+   为何不能简单分批：该接口只接受 days（永远从今天倒推），不支持 date / from-to / offset，
+             多批请求会拿回完全相同的数据，拆批无效（已实测四种参数均被忽略）。
+   治本方案：混合数据源 —— 只有最近几天的数据会变化，更早的历史数据是静态的。
+             · 近 FC_WINDOW 天  → 走 FC 实时接口（绕过 CDN 缓存，保证今天的数据准确）
+             · 第 FC_WINDOW 天以前 → 走 jsDelivr CDN（历史数据不再变化，缓存延迟无影响）
+             两段并行发出后拼接，任意天数都稳定在 5 秒内返回，永不触发 502。 */
+var FC_WINDOW = 7;   // FC 实时窗口天数，实测 7 天约 4.5s，留足超时余量
+
+function fcRange(days) {
   return fetch(WORKER_URL + '/stats?days=' + days, { cache: 'no-store' })
     .then(function(r) { if (!r.ok) throw new Error('实时接口 HTTP ' + r.status); return r.json(); })
     .then(function(j) {
       var results = (j && j.results) || [];
+      /* FC 返回今天在前，reverse 成 旧→新，与 jsDelivr 版保持一致 */
       return results.slice().reverse().map(function(x) {
         return { date: x.date, visits: Array.isArray(x.visits) ? x.visits : [] };
       });
     });
 }
 
-function escapeHtml(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
-    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-  });
+/* 取 [days-1 .. skipRecent] 区间的历史数据（相对今天的天数偏移），返回 旧→新 */
+function cdnRange(days, skipRecent) {
+  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/stats/';
+  var now = new Date();
+  var tasks = [];
+  for (var i = days - 1; i >= skipRecent; i--) {
+    var d = new Date(now); d.setDate(now.getDate() - i);
+    var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    (function(dateStr) {
+      tasks.push(
+        fetch(CDN + dateStr + '.json')
+          .then(function(r) { return r.ok ? r.json() : []; })
+          .then(function(arr) { return { date: dateStr, visits: Array.isArray(arr) ? arr : [] }; })
+          .catch(function() { return { date: dateStr, visits: [] }; })
+      );
+    })(ds);
+  }
+  return Promise.all(tasks);
 }
+
+function fetchStatsFromFC(days) {
+  if (days <= FC_WINDOW) return fcRange(days);
+  /* 历史段(旧) + 实时段(近FC_WINDOW天) 并行拉取后拼接，保持 旧→新 顺序 */
+  return Promise.all([cdnRange(days, FC_WINDOW), fcRange(FC_WINDOW)])
+    .then(function(parts) { return parts[0].concat(parts[1]); });
+}
+
 function renderStatsData(results, days) {
   var allVisits = [], dailyCounts = [];
   results.forEach(function(r) {
@@ -2093,13 +2124,13 @@ function renderStatsData(results, days) {
     r.visits.forEach(function(v) { v._date = r.date; allVisits.push(v); });
   });
   var totalVisits = allVisits.length;
-  var todayCount = results[0] ? results[0].visits.length : 0;
-  var deviceMap = {}, browserMap = {}, osMap = {}, locMap = {};
+  /* 2026-08-01 修正：results 为 旧→新 排列，最新一天应取末尾元素（原写成 results[0] 取到的是最早一天） */
+  var todayCount = results.length ? results[results.length - 1].visits.length : 0;
+  var deviceMap = {}, browserMap = {}, osMap = {};
   allVisits.forEach(function(v) {
     deviceMap[v.device || '未知'] = (deviceMap[v.device || '未知'] || 0) + 1;
     browserMap[v.browser || '未知'] = (browserMap[v.browser || '未知'] || 0) + 1;
     osMap[v.os || '未知'] = (osMap[v.os || '未知'] || 0) + 1;
-    if (v.location) locMap[v.location] = (locMap[v.location] || 0) + 1;
   });
   var maxCount = Math.max.apply(null, dailyCounts.map(function(d) { return d.count; }).concat([1]));
   var colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -2136,13 +2167,13 @@ function renderStatsData(results, days) {
   h += pieSection('设备分布', deviceMap);
   h += pieSection('浏览器分布', browserMap);
   h += pieSection('操作系统', osMap);
-  h += pieSection('地域分布', locMap, '暂无地域数据');
+  /* 2026-08-01 整改：已移除「地域分布」板块（IP 采集功能整体下线） */
   /* 访问明细 */
   h += '<div class="stats-section"><h3>访问明细（最近50条）</h3><div style="overflow-x:auto">';
-  h += '<table class="stats-tbl"><thead><tr><th>时间</th><th>IP</th><th>位置</th><th>设备</th><th>系统</th><th>浏览器</th><th>屏幕</th><th>来源</th></tr></thead><tbody>';
+  h += '<table class="stats-tbl"><thead><tr><th>时间</th><th>设备</th><th>系统</th><th>浏览器</th><th>屏幕</th><th>来源</th></tr></thead><tbody>';
   allVisits.slice(-50).reverse().forEach(function(v) {
     var t = v.time ? escapeHtml(v.time.replace('T', ' ').slice(0, 19)) : '-';
-    h += '<tr><td>' + t + '</td><td>' + (v.ip ? escapeHtml(v.ip) : '-') + '</td><td>' + (v.location ? escapeHtml(v.location) : '-') + '</td>';
+    h += '<tr><td>' + t + '</td>';
     h += '<td>' + (v.device ? escapeHtml(v.device) : '-') + '</td><td>' + (v.os ? escapeHtml(v.os) : '-') + '</td><td>' + (v.browser ? escapeHtml(v.browser) : '-') + '</td>';
     h += '<td>' + (v.screen ? escapeHtml(v.screen) : '-') + '</td>';
     h += '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(v.referrer || '') + '">' + (v.referrer ? escapeHtml(v.referrer) : '直接访问') + '</td></tr>';
@@ -2153,10 +2184,10 @@ function renderStatsData(results, days) {
 
 function exportStatsCSV() {
   if (!currentStatsResults.length) { alert('暂无数据可导出'); return; }
-  var rows = [['日期','时间','设备','系统','浏览器','屏幕','来源','IP','位置']];
+  var rows = [['日期','时间','设备','系统','浏览器','屏幕','来源']];
   currentStatsResults.forEach(function(r){
     r.visits.forEach(function(v){
-      rows.push([r.date, v.time || '', v.device || '', v.os || '', v.browser || '', v.screen || '', v.referrer || '', v.ip || '', v.location || '']);
+      rows.push([r.date, v.time || '', v.device || '', v.os || '', v.browser || '', v.screen || '', v.referrer || '']);
     });
   });
   var csv = '﻿' + rows.map(function(row){ return row.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(','); }).join('\r\n');
@@ -2176,6 +2207,8 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function() {});
 }
 </script>
+<!-- 网页截图依赖：必须在下方截图脚本之前加载，否则页面刚打开时点击会抛 html2canvas is not defined -->
+<script src="html2canvas.min.js"></script>
 <script>
 (function(){
   var b=document.createElement('button');
@@ -2220,60 +2253,6 @@ if ('serviceWorker' in navigator) {
 </script>
 
 
-<!-- 网页截图功能（仅客户档案/行情资讯） -->
-<script src="html2canvas.min.js"></script>
-<script>
-(function(){
-  var TARGET=['cat-05','cat-06'];
-  function inScope(){try{return window.currentFile && TARGET.indexOf(window.currentFile.category)>=0;}catch(e){return false;}}
-  var b=document.createElement('button');
-  b.id='pom-shot-btn';b.innerHTML='📷';b.title='截取当前页面为图片';
-  b.style.cssText='position:fixed;right:16px;bottom:16px;z-index:999999;width:50px;height:50px;border-radius:50%;border:none;background:rgba(37,99,235,0.92);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;transition:transform .2s,opacity .2s;line-height:1;padding:0';
-  b.onmouseenter=function(){b.style.transform='scale(1.12)'};
-  b.onmouseleave=function(){b.style.transform='scale(1)'};
-  document.body.appendChild(b);
-  function updateBtn(){b.style.display=inScope()?'flex':'none';}
-  b.addEventListener('click',function(){
-    if(b.dataset.busy==='1')return;
-    b.dataset.busy='1';b.style.opacity='.4';
-    var o=b.innerHTML;b.innerHTML='⏳';b.style.display='none';
-    var targets=[document.body,document.querySelector('.main'),document.querySelector('.content-wrap'),document.querySelector('.sidebar')].filter(Boolean);
-    var saved=targets.map(function(el){return{el:el,ov:el.style.overflow,h:el.style.height,mh:el.style.maxHeight}});
-    targets.forEach(function(el){el.style.overflow='visible';el.style.height='auto';el.style.maxHeight='none'});
-    var cw=document.querySelector('.content-wrap');if(cw)cw.scrollTop=0;
-    window.scrollTo(0,0);
-    var fix=document.createElement('style');fix.id='pom-shot-fix';fix.textContent='*{-webkit-background-clip:border-box!important;-webkit-text-fill-color:initial!important}';document.head.appendChild(fix);
-    setTimeout(function(){
-      html2canvas(document.body,{useCORS:true,scrollX:0,scrollY:0,
-        width:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth),
-        height:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),
-        windowWidth:document.documentElement.scrollWidth,
-        windowHeight:document.documentElement.scrollHeight,
-        backgroundColor:null
-      }).then(function(c){
-        saved.forEach(function(s){s.el.style.overflow=s.ov;s.el.style.height=s.h;s.el.style.maxHeight=s.mh});
-        document.head.removeChild(fix);
-        var a=document.createElement('a');
-        a.download=(document.title||'screenshot').replace(/[\\/:*?"<>|]/g,'_')+'.png';
-        a.href=c.toDataURL('image/png');a.click();
-      }).catch(function(e){
-        saved.forEach(function(s){s.el.style.overflow=s.ov;s.el.style.height=s.h;s.el.style.maxHeight=s.mh});
-        document.head.removeChild(fix);
-        alert('截图失败：'+e.message);
-      }).then(function(){
-        b.style.display=inScope()?'flex':'none';b.innerHTML=o;b.style.opacity='';b.dataset.busy='0';
-      });
-    },150);
-  });
-  // 仅在客户档案(cat-05)/行情资讯(cat-06)显示
-  var cw=document.getElementById('contentWrap')||document.querySelector('.content-wrap');
-  if(cw && 'MutationObserver' in window){
-    new MutationObserver(updateBtn).observe(cw,{childList:true,subtree:true});
-  }
-  window.addEventListener('hashchange',updateBtn);
-  updateBtn();
-})();
-</script>
 
 </body>
 </html>
