@@ -418,19 +418,6 @@ body {
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<div class="pw-overlay" id="pwOverlay">
-  <div class="pw-dialog">
-    <div class="pw-icon">🔐</div>
-    <h3>访问验证</h3>
-    <div class="pw-desc">该分类需要输入密码才能访问</div>
-    <input type="password" id="pwInput" placeholder="请输入密码" onkeydown="if(event.key==='Enter')confirmPw()">
-    <div class="pw-error" id="pwError">密码错误，请重新输入</div>
-    <div class="pw-btns">
-      <button class="pw-cancel" onclick="closePwModal()">取消</button>
-      <button class="pw-confirm" onclick="confirmPw()">确认</button>
-    </div>
-  </div>
-</div>
 <div class="pw-overlay" id="delOverlay">
   <div class="pw-dialog">
     <div class="pw-icon">🗑️</div>
@@ -449,14 +436,7 @@ body {
     <button class="close-btn" onclick="closeStats()">✕ 关闭</button>
   </div>
   <div class="stats-body" id="statsBody">
-    <div class="stats-pw" id="statsPw">
-      <div style="font-size:36px;margin-bottom:8px">🔐</div>
-      <h3 style="font-size:16px;font-weight:600">统计面板需要验证</h3>
-      <input type="password" id="statsPwInput" placeholder="请输入密码" onkeydown="if(event.key==='Enter')verifyStatsPw()">
-      <div class="err" id="statsPwErr">密码错误</div>
-      <button onclick="verifyStatsPw()">确认</button>
-    </div>
-    <div id="statsContent" style="display:none">
+    <div id="statsContent">
       <div class="stats-toolbar">
         <div class="stats-range">
           <button class="range-btn active" data-days="7" onclick="loadStats(7)">近7天</button>
@@ -537,12 +517,10 @@ function buildSearchIndex() {
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
 
-/* ===== 密码保护 ===== */
-var PW_HASH = 'cG9tMjAyNg==';
+/* ===== 密码保护（已取消在线密码；内容构建时加密、前端用内置密钥自动解密，用户无感访问） ===== */
 var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '08-生产工艺'];
-var unlocked = sessionStorage.getItem('pom_kb_unlocked') === '1';
-var masterKey = sessionStorage.getItem('pom_kb_master') || null;
-var pwCallback = null;
+var unlocked = true;            // 已取消密码门槛，默认解锁
+var masterKey = 'pom2026';      // 内置解密密钥（与 build-static.js MASTER 一致），自动解密受保护分类正文
 
 /* 解密构建端加密的内容（与 build-static.js 使用相同 CryptoJS 参数） */
 function decryptText(payload, password) {
@@ -563,41 +541,8 @@ function isProtected(catKey) {
 }
 
 function requireUnlock(catKey, callback) {
-  if (!isProtected(catKey) || unlocked) { callback(); return; }
-  pwCallback = callback;
-  document.getElementById('pwInput').value = '';
-  document.getElementById('pwError').style.display = 'none';
-  document.getElementById('pwInput').classList.remove('error');
-  document.getElementById('pwOverlay').classList.add('show');
-  setTimeout(function() { document.getElementById('pwInput').focus(); }, 100);
-}
-
-function confirmPw() {
-  var val = document.getElementById('pwInput').value;
-  if (!val) { document.getElementById('pwError').style.display = 'block'; return; }
-  var probeClear;
-  try { probeClear = decryptText(kbData.probe, val); } catch (e) { probeClear = ''; }
-  if (probeClear === 'POM_PROBE_OK') {
-    unlocked = true;
-    masterKey = val;
-    sessionStorage.setItem('pom_kb_unlocked', '1');
-    sessionStorage.setItem('pom_kb_master', val);
-    document.getElementById('pwOverlay').classList.remove('show');
-    renderSidebar(document.getElementById('searchInput').value.trim());
-    buildSearchIndex();
-    if (pwCallback) { pwCallback(); pwCallback = null; }
-    showToast('验证成功');
-  } else {
-    document.getElementById('pwError').style.display = 'block';
-    document.getElementById('pwInput').classList.add('error');
-    document.getElementById('pwInput').value = '';
-    document.getElementById('pwInput').focus();
-  }
-}
-
-function closePwModal() {
-  document.getElementById('pwOverlay').classList.remove('show');
-  pwCallback = null;
+  // 已取消在线密码，直接放行（正文由前端用内置 masterKey 自动解密）
+  callback();
 }
 
 /* ===== 学习工具（虚拟分类） ===== */
@@ -1060,7 +1005,7 @@ async function openFile(category, filename, subfolder) {
   var htmlToRender = file.html;
   if (file.encrypted) {
     try { htmlToRender = decryptText(file.html, masterKey); }
-    catch (e) { htmlToRender = '<p style="color:#ef4444">解密失败，请重新输入密码后重试。</p>'; }
+    catch (e) { htmlToRender = '<p style="color:#ef4444">内容解密失败，请刷新页面重试。</p>'; }
   }
   content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(htmlToRender.indexOf('md-content') >= 0 ? htmlToRender : '<div class="md-content">' + htmlToRender + '</div>');
   content.scrollTop = 0;
@@ -2055,19 +2000,10 @@ function fetchVisitIp() {
   });
 }
 
-function openStats() { document.getElementById('statsOverlay').classList.add('show'); }
+function openStats() { document.getElementById('statsOverlay').classList.add('show'); loadStats(); }
 function closeStats() { document.getElementById('statsOverlay').classList.remove('show'); }
 
-function verifyStatsPw() {
-  var val = document.getElementById('statsPwInput').value;
-  if (btoa(val) === PW_HASH) {
-    document.getElementById('statsPw').style.display = 'none';
-    document.getElementById('statsContent').style.display = 'block';
-    loadStats();
-  } else {
-    document.getElementById('statsPwErr').style.display = 'block';
-  }
-}
+/* verifyStatsPw 已移除：统计面板不再设密码，openStats 直接 loadStats() */
 
 var currentStatsDays = 7;
 var currentStatsResults = [];
