@@ -752,6 +752,16 @@ async function loadCustomers() {
   } catch (e2) {
     console.warn('jsDelivr 读取客户档案失败', e2);
   }
+  // 离线兜底：本地 customers.json 快照（桌面端 CSP 拦了 FC/CDN 时使用；浏览器部署/本地服务下也能走）
+  try {
+    var res3 = await fetch('customers.json?t=' + Date.now());
+    if (res3.ok) {
+      customersData = await res3.json() || { records: [] };
+      return;
+    }
+  } catch (e3) {
+    console.warn('本地 customers.json 读取失败', e3);
+  }
   customersData = { records: [] };
 }
 
