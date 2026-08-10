@@ -111,12 +111,18 @@ body {
 }
 .breadcrumb { font-size: 13px; color: var(--text-secondary); }
 .breadcrumb span { color: var(--text-primary); font-weight: 600; }
-.topbar-actions { margin-left: auto; display: flex; gap: 8px; }
+.topbar-actions { display: flex; gap: 8px; }
 .topbar-actions button {
   padding: 5px 14px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--bg-card); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all .15s;
 }
 .topbar-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.sync-btn {
+  margin-left: auto; padding: 5px 14px; border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--accent); color: #fff; font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.sync-btn:hover { opacity: .92; }
+.sync-btn:disabled { opacity: .6; cursor: not-allowed; }
 .content-wrap { flex: 1; overflow-y: auto; padding: 28px 36px 60px; }
 .welcome { max-width: 760px; margin: 30px auto; text-align: center; }
 .welcome h2 { font-size: 26px; font-weight: 700; margin-bottom: 12px; }
@@ -411,6 +417,7 @@ body {
   <div class="topbar">
     <button class="menu-btn" onclick="toggleSidebar()" aria-label="菜单">☰</button>
     <div class="breadcrumb" id="breadcrumb">知识库首页</div>
+    <button class="sync-btn" id="syncOnlineBtn" onclick="syncOnlineCustomers()" title="从线上 GitHub 拉取最新客户档案同步到本地">🔄 同步线上内容</button>
     <div class="topbar-actions" id="topbarActions"></div>
   </div>
   <div class="content-wrap" id="contentWrap">
@@ -761,6 +768,85 @@ function mergeCustomers() {
   var all = (customersData && customersData.records) ? customersData.records : [];
   var records = all.filter(function(r) { return r.deleted !== true; }).slice().reverse();
   cat._customerRecords = records;
+}
+
+/* ===== 同步线上客户档案到本地 ===== */
+/* 2026-08-10 新增：顶栏「🔄 同步线上内容」按钮调用。
+   智能适配两种环境：
+   ① 桌面端（pom-knowledge-app Electron）：通过 window.parent.api.syncCustomers() 走主进程 IPC，
+      由主进程 fetch 线上（绕过 CSP connect-src 'self' 限制）并写入 app/kb/customers.json。
+   ② 浏览器站（部署到 GitHub 或 启动知识库.bat 本地服务）：直接 fetch 阿里云FC+jsDelivr，
+      若本地服务在跑则 POST /api/sync-write 写回 dist/customers.json，否则仅刷新显示。 */
+async function syncOnlineCustomers() {
+  var btn = document.getElementById('syncOnlineBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 同步中...'; }
+  showToast('正在从线上同步客户档案...');
+  try {
+    var res = null;
+
+    // 路径 A：桌面端 Electron IPC（主进程 fetch + 写本地文件，绕过 CSP）
+    try {
+      if (window.parent && window.parent.api && typeof window.parent.api.syncCustomers === 'function') {
+        res = await window.parent.api.syncCustomers();
+      }
+    } catch (e) { console.warn('Electron IPC 同步失败，回退 HTTP', e); }
+
+    // 路径 B：浏览器站（直接 fetch 线上 + 可选 POST /api/sync-write）
+    if (!res) {
+      var data = null;
+      try {
+        var r1 = await fetch(WORKER_URL + '/customers?_=' + Date.now(), { cache: 'no-store' });
+        if (r1.ok) data = await r1.json();
+      } catch (e) { console.warn('同步：阿里云FC读取失败，尝试 jsDelivr', e); }
+      if (!data) {
+        var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/customers.json?_=' + Date.now();
+        try {
+          var r2 = await fetch(CDN, { cache: 'no-store' });
+          if (r2.ok) data = await r2.json();
+        } catch (e2) { console.warn('同步：jsDelivr读取失败', e2); }
+      }
+      if (!data || !data.records) throw new Error('线上客户数据为空或读取失败');
+
+      customersData = data;
+      mergeCustomers(); buildSearchIndex(); renderSidebar();
+      var onTable = !!document.getElementById('custTableBody');
+      var cat05 = (kbData && kbData.categories) ? kbData.categories['05-客户档案'] : null;
+      if (cat05 && cat05._customerRecords && onTable && (!isProtected('05-客户档案') || unlocked)) showCustomerTable();
+
+      var savedLocal = false;
+      try {
+        var put = await fetch('/api/sync-write?file=customers.json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (put.ok) savedLocal = true;
+      } catch (e3) { /* file:// 打开或远端部署，忽略 */ }
+
+      res = { ok: true, count: data.records.length, savedToLocal: savedLocal };
+    }
+
+    if (!res || !res.ok) throw new Error((res && res.error) || '同步失败');
+
+    // IPC 写本地成功后，重新走本地兜底加载并刷新视图
+    if (res.savedToLocal) {
+      try {
+        await loadCustomers();
+        mergeCustomers(); buildSearchIndex(); renderSidebar();
+        var onTable2 = !!document.getElementById('custTableBody');
+        var cat05b = (kbData && kbData.categories) ? kbData.categories['05-客户档案'] : null;
+        if (cat05b && cat05b._customerRecords && onTable2 && (!isProtected('05-客户档案') || unlocked)) showCustomerTable();
+      } catch (e4) { console.warn('同步后刷新视图失败', e4); }
+    }
+
+    var msg = '✅ 已从线上同步 ' + res.count + ' 条客户档案';
+    msg += res.savedToLocal ? '，已写入本地文件' : '，线上数据已刷新';
+    showToast(msg);
+  } catch (e) {
+    showToast('❌ 同步失败：' + (e && e.message ? e.message : e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 同步线上内容'; }
+  }
 }
 
 function generateCustomerMd(rec) {
