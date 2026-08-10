@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pom-kb-202608110011';
+var CACHE_NAME = 'pom-kb-202608110147';
 /* 预缓存骨架：导航页 + JS 库。数据文件(data-index.json / cat-*.json)走运行时懒加载缓存 */
 var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'fuse.min.js', 'crypto-js.min.js', 'lib/leaflet/leaflet.min.css', 'lib/leaflet/leaflet.min.js'];
 
