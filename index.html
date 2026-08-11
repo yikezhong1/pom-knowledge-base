@@ -20,8 +20,8 @@
   --text-secondary: #64748b;
   --text-sidebar: #cbd5e1;
   --text-sidebar-active: #f1f5f9;
-  --accent: #2563eb;
-  --accent-light: #dbeafe;
+  --accent: #0F766E;
+  --accent-light: #ccfbf1;
   --border: #e2e8f0;
   --shadow: 0 1px 3px rgba(0,0,0,.08);
   --radius: 8px;
@@ -125,15 +125,24 @@ body {
 .sync-btn:hover { opacity: .92; }
 .sync-btn:disabled { opacity: .6; cursor: not-allowed; }
 .content-wrap { flex: 1; overflow-y: auto; padding: 28px 36px 60px; }
-.welcome { max-width: 760px; margin: 30px auto; text-align: center; }
-.welcome h2 { font-size: 26px; font-weight: 700; margin-bottom: 12px; }
-.welcome p { color: var(--text-secondary); font-size: 15px; line-height: 1.8; }
-.welcome .stats { display: flex; justify-content: center; gap: 32px; margin-top: 28px; }
-.welcome .stat-item { text-align: center; }
-.welcome .stat-num { font-size: 32px; font-weight: 700; color: var(--accent); }
-.welcome .stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.welcome { max-width: 1080px; margin: 28px auto 0; }
+.hero {
+  background: linear-gradient(135deg, #0F766E 0%, #0d9488 60%, #14b8a6 100%);
+  border-radius: 20px; padding: 52px 40px 44px; text-align: center; color: #fff;
+  position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(15,118,110,.18);
+}
+.hero::after {
+  content: ''; position: absolute; right: -70px; top: -70px; width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(255,255,255,.12), transparent 70%); border-radius: 50%;
+}
+.hero h1 { font-size: 34px; font-weight: 800; margin: 0 0 10px; letter-spacing: .5px; position: relative; }
+.hero .hero-sub { font-size: 15px; opacity: .92; margin-bottom: 30px; position: relative; }
+.hero .home-search { max-width: 640px; margin: 0 auto; position: relative; }
+.hero-stats { display: flex; justify-content: center; gap: 14px; margin-top: 30px; flex-wrap: wrap; position: relative; }
+.hero-stat { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); border-radius: 14px; padding: 14px 26px; min-width: 116px; }
+.hero-stat .hs-num { font-size: 28px; font-weight: 800; line-height: 1; }
+.hero-stat .hs-label { font-size: 12px; opacity: .88; margin-top: 6px; }
 /* 首页搜索 */
-.home-search { max-width: 520px; margin: 28px auto 0; }
 .search-tabs { display: flex; justify-content: center; margin-bottom: 10px; }
 .search-tab {
   padding: 5px 20px; border: 1px solid var(--border); background: var(--bg-card);
@@ -148,22 +157,22 @@ body {
   border: 2px solid var(--border); background: var(--bg-card); font-size: 15px;
   outline: none; transition: all .2s; color: var(--text-primary);
 }
-.home-search-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.home-search-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15,118,110,.12); }
 .home-search-row .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-secondary); pointer-events: none; }
 .web-search-btn {
   padding: 10px 22px; background: var(--accent); color: #fff; border: none; border-radius: 10px;
   font-size: 14px; cursor: pointer; transition: background .15s; white-space: nowrap; display: none;
 }
-.web-search-btn:hover { background: #1d4ed8; }
+.web-search-btn:hover { background: #0d5d56; }
 .web-search-btn.show { display: block; }
-.search-results { max-width: 760px; margin: 20px auto 0; text-align: left; }
+.search-results { max-width: 1080px; margin: 20px auto 0; text-align: left; }
 .search-results .sr-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
 .sr-item {
   display: flex; align-items: center; padding: 10px 16px; background: var(--bg-card);
   border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px;
   cursor: pointer; transition: all .15s;
 }
-.sr-item:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(37,99,235,.06); }
+.sr-item:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(15,118,110,.08); }
 .sr-item .sr-icon { font-size: 16px; margin-right: 12px; }
 .sr-item .sr-name { font-size: 14px; font-weight: 600; }
 .sr-item .sr-cat { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
@@ -171,16 +180,19 @@ body {
 .sr-item .sr-body { flex: 1; min-width: 0; }
 .sr-item .sr-snippet { font-size: 12px; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 分类卡片 */
-.welcome .categories-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
+.welcome .section-title { font-size: 18px; font-weight: 700; margin: 38px 0 16px; color: var(--text-primary); }
+.welcome .categories-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 0; }
 .welcome .cat-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px 12px; cursor: pointer; transition: all .2s; position: relative;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 22px 18px; cursor: pointer; transition: all .2s; position: relative;
 }
-.welcome .cat-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(37,99,235,.08); }
-.welcome .cat-card .cat-icon { font-size: 24px; }
-.welcome .cat-card .cat-name { font-size: 13px; font-weight: 600; margin-top: 8px; }
-.welcome .cat-card .cat-count { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-.welcome .cat-card .card-lock { position: absolute; top: 8px; right: 8px; font-size: 12px; opacity: .5; }
+.welcome .cat-card:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(15,118,110,.10); transform: translateY(-2px); }
+.welcome .cat-card.locked { border-color: #fcd34d; background: linear-gradient(180deg,#fffbeb,#fff); }
+.welcome .cat-card .cat-icon { font-size: 30px; }
+.welcome .cat-card .cat-name { font-size: 15px; font-weight: 700; margin-top: 10px; }
+.welcome .cat-card .cat-count { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.welcome .cat-card .card-lock { position: absolute; top: 12px; right: 12px; font-size: 11px; background: #fef3c7; color: #b45309; border-radius: 999px; padding: 3px 9px; font-weight: 600; }
+.kb-footer { text-align: center; color: var(--text-secondary); font-size: 12px; margin-top: 42px; padding-top: 18px; border-top: 1px solid var(--border); }
 /* 分类专属页面 */
 .category-page { max-width: 860px; margin: 0 auto; }
 .category-page .cp-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--border); }
@@ -553,7 +565,7 @@ function buildSearchIndex() {
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
 
 /* ===== 密码保护（已取消在线密码；内容构建时加密、前端用内置密钥自动解密，用户无感访问） ===== */
-var PROTECTED_CATS = ['05-客户档案', '06-行情资讯', '08-生产工艺'];
+var PROTECTED_CATS = ['04-客户档案', '05-行情与行业', '06-生产工艺'];
 var unlocked = true;            // 已取消密码门槛，默认解锁
 var masterKey = 'pom2026';      // 内置解密密钥（与 build-static.js MASTER 一致），自动解密受保护分类正文
 
@@ -796,7 +808,7 @@ async function loadCustomers() {
 
 function mergeCustomers() {
   if (!kbData || !kbData.categories) return;
-  var catKey = '05-客户档案';
+  var catKey = '04-客户档案';
   var cat = kbData.categories[catKey];
   if (!cat) return;
   /* 移除旧版子文件夹形式的在线记录 */
@@ -905,8 +917,8 @@ async function syncOnlineCustomers() {
       customersData = data;
       mergeCustomers(); buildSearchIndex(); renderSidebar();
       var onTable = !!document.getElementById('custTableBody');
-      var cat05 = (kbData && kbData.categories) ? kbData.categories['05-客户档案'] : null;
-      if (cat05 && cat05._customerRecords && onTable && (!isProtected('05-客户档案') || unlocked)) showCustomerTable();
+      var cat05 = (kbData && kbData.categories) ? kbData.categories['04-客户档案'] : null;
+      if (cat05 && cat05._customerRecords && onTable && (!isProtected('04-客户档案') || unlocked)) showCustomerTable();
 
       var savedLocal = false;
       try {
@@ -929,8 +941,8 @@ async function syncOnlineCustomers() {
         await loadCustomers();
         mergeCustomers(); buildSearchIndex(); renderSidebar();
         var onTable2 = !!document.getElementById('custTableBody');
-        var cat05b = (kbData && kbData.categories) ? kbData.categories['05-客户档案'] : null;
-        if (cat05b && cat05b._customerRecords && onTable2 && (!isProtected('05-客户档案') || unlocked)) showCustomerTable();
+        var cat05b = (kbData && kbData.categories) ? kbData.categories['04-客户档案'] : null;
+        if (cat05b && cat05b._customerRecords && onTable2 && (!isProtected('04-客户档案') || unlocked)) showCustomerTable();
       } catch (e4) { console.warn('同步后刷新视图失败', e4); }
     }
 
@@ -1049,14 +1061,14 @@ function renderSidebar(filter) {
     var lockHtml = locked ? '<span class="lock-badge">🔒</span>' : '';
     html += '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="onCatClick(this,\'' + catKey + '\')"><span class="icon">' + cat.icon + '</span><span>' + cat.label + '</span>' + lockHtml + '<span class="count">' + totalCount + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
     /* 客户档案分类：侧边栏只保留"现有客户档案"表格入口 */
-    if (catKey.indexOf('05-客户档案') === 0 && !locked) {
+    if (catKey.indexOf('04-客户档案') === 0 && !locked) {
       var custCount = (cat._customerRecords || []).length;
       html += '<div class="file-item" onclick="showCustomerTable()"><span class="dot" style="background:#10b981"></span><span>📋 现有客户档案</span><span class="ext-badge form">' + custCount + '</span></div>';
     }
     for (var fi = 0; fi < files.length; fi++) {
       var f = files[fi];
       /* 客户档案分类：侧边栏隐藏客户信息模板（分类页面仍可打开） */
-      if (catKey.indexOf('05-客户档案') === 0 && f.name && f.name.indexOf('客户信息模板') >= 0) continue;
+      if (catKey.indexOf('04-客户档案') === 0 && f.name && f.name.indexOf('客户信息模板') >= 0) continue;
       var active = currentFile && currentFile.category === f.category && currentFile.filename === f.filename && !currentFile.subfolder;
       html += '<div class="file-item' + (active ? ' active' : '') + '" onclick="openFile(\'' + f.category + '\',\'' + f.filename + '\',\'\')"><span class="dot"></span><span>' + f.name + '</span><span class="ext-badge ' + f.ext + '">' + f.ext + '</span></div>';
     }
@@ -1212,8 +1224,8 @@ async function openFile(category, filename, subfolder) {
 
 /* ===== 在线填报表单 ===== */
 function showCustomerForm() {
-  if (isProtected('05-客户档案') && !unlocked) {
-    requireUnlock('05-客户档案', function() { showCustomerForm(); });
+  if (isProtected('04-客户档案') && !unlocked) {
+    requireUnlock('04-客户档案', function() { showCustomerForm(); });
     return;
   }
   currentFile = null;
@@ -1633,13 +1645,13 @@ async function submitCustomerForm() {
 
 /* ===== 现有客户档案表格 ===== */
 function showCustomerTable() {
-  if (isProtected('05-客户档案') && !unlocked) {
-    requireUnlock('05-客户档案', function() { showCustomerTable(); });
+  if (isProtected('04-客户档案') && !unlocked) {
+    requireUnlock('04-客户档案', function() { showCustomerTable(); });
     return;
   }
   destroyMap();
   customerMapState = null;
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   currentFile = null;
   renderSidebar();
@@ -1687,7 +1699,7 @@ function filterCustomerTable(val) {
 }
 
 function showCustomerDetail(index) {
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) return;
@@ -1706,12 +1718,12 @@ function showCustomerDetail(index) {
 
 /* ===== 客户分布区域图 ===== */
 function showCustomerMap(fromMap) {
-  if (isProtected('05-客户档案') && !unlocked) {
-    requireUnlock('05-客户档案', function() { showCustomerMap(fromMap); });
+  if (isProtected('04-客户档案') && !unlocked) {
+    requireUnlock('04-客户档案', function() { showCustomerMap(fromMap); });
     return;
   }
   destroyMap();
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   currentFile = null;
   renderSidebar();
@@ -1913,7 +1925,7 @@ var pendingDeleteIndex = -1;
 
 function confirmDeleteCustomer(index, event) {
   if (event) { event.stopPropagation(); }
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) return;
@@ -1930,7 +1942,7 @@ function closeDeleteModal() {
 async function executeDeleteCustomer() {
   var index = pendingDeleteIndex;
   if (index < 0) return;
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) { closeDeleteModal(); return; }
@@ -1972,11 +1984,11 @@ function editCustomer(index, event) {
 }
 
 function showCustomerEditForm(index) {
-  if (isProtected('05-客户档案') && !unlocked) {
-    requireUnlock('05-客户档案', function() { showCustomerEditForm(index); });
+  if (isProtected('04-客户档案') && !unlocked) {
+    requireUnlock('04-客户档案', function() { showCustomerEditForm(index); });
     return;
   }
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) return;
@@ -2041,7 +2053,7 @@ function showCustomerEditForm(index) {
 async function saveCustomerEdit() {
   var index = pendingEditIndex;
   if (index < 0) return;
-  var cat = kbData.categories['05-客户档案'];
+  var cat = kbData.categories['04-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) { showToast('记录不存在'); return; }
@@ -2138,8 +2150,10 @@ function showWelcome() {
       catTotal += (sub.files || []).length;
       (sub.groups || []).forEach(function(g) { catTotal += g.files.length; });
     });
-    var lockIcon = isProtected(key) && !unlocked ? '<div class="card-lock">🔒</div>' : '';
-    catsHtml += '<div class="cat-card" onclick="onCatCardClick(\'' + key + '\')">' + lockIcon + '<div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
+    var isProt = isProtected(key);
+    var lockIcon = isProt ? '<div class="card-lock">🔒 加密</div>' : '';
+    var cardCls = 'cat-card' + (isProt ? ' locked' : '');
+    catsHtml += '<div class="' + cardCls + '" onclick="onCatCardClick(\'' + key + '\')">' + lockIcon + '<div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
     if (!toolsCardInjected && key.indexOf('02-') === 0) {
       catsHtml += '<div class="cat-card" onclick="showToolsPage()"><div class="cat-icon">📚</div><div class="cat-name">学习工具</div><div class="cat-count">' + LEARNING_TOOLS.length + ' 个工具</div></div>';
       toolsCardInjected = true;
@@ -2151,15 +2165,22 @@ function showWelcome() {
   document.getElementById('breadcrumb').innerHTML = '知识库首页';
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="welcome">'
-    + '<h2>POM 聚甲醛知识库</h2>'
-    + '<p>涵盖基础知识、产品知识、销售话术、行情资讯等全方位业务资料</p>'
+    + '<div class="hero">'
+    + '<h1>聚甲醛销售知识库</h1>'
+    + '<div class="hero-sub">共聚甲醛国产料销售 · 换料替代 · 行情与工艺一站式资料中心</div>'
     + '<div class="home-search">'
     + '<div class="search-tabs"><button class="search-tab active" onclick="switchSearchTab(\'local\',this)">站内</button><button class="search-tab" onclick="switchSearchTab(\'web\',this)">站外</button></div>'
     + '<div class="home-search-row"><span class="search-icon">🔍</span><input type="text" id="homeSearchInput" placeholder="搜索知识库内容..." oninput="onHomeSearch(this.value)" onkeydown="if(event.key===\'Enter\'&&searchMode===\'web\')doWebSearch(this.value)"><button class="web-search-btn" id="webSearchBtn" onclick="doWebSearch(document.getElementById(\'homeSearchInput\').value)">搜索</button></div>'
     + '</div>'
-    + '<div id="homeSearchResults"></div>'
-    + '<div class="stats"><div class="stat-item"><div class="stat-num">' + cats.length + '</div><div class="stat-label">分类目录</div></div><div class="stat-item"><div class="stat-num">' + totalFiles + '</div><div class="stat-label">知识文件</div></div><div class="stat-item"><div class="stat-num">' + (totalSize / 1024).toFixed(0) + '</div><div class="stat-label">KB 总容量</div></div></div>'
+    + '<div class="hero-stats">'
+    + '<div class="hero-stat"><div class="hs-num">' + cats.length + '</div><div class="hs-label">分类目录</div></div>'
+    + '<div class="hero-stat"><div class="hs-num">' + totalFiles + '</div><div class="hs-label">知识文件</div></div>'
+    + '<div class="hero-stat"><div class="hs-num">' + (totalSize / 1024).toFixed(0) + '</div><div class="hs-label">KB 总容量</div></div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="section-title">浏览分类</div>'
     + '<div class="categories-grid">' + catsHtml + '</div>'
+    + '<div class="kb-footer">版权所有 2026 · 新疆心连心 / 心瑞 · 共聚甲醛销售知识库</div>'
     + '</div>';
   if (kbData.readme) {
     html += '<div style="max-width:860px;margin:30px auto 0"><div class="md-content">' + safeHtml(kbData.readme) + '</div></div>';
@@ -2294,7 +2315,7 @@ async function showCategoryPage(catKey) {
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">' + cat.icon + '</div><div><div class="cp-title">' + cat.label + '</div><div class="cp-count">' + allFiles.length + ' 个文件</div></div></div>';
   /* 客户档案分类：添加在线填报按钮 */
-  if (catKey.indexOf('05-客户档案') === 0) {
+  if (catKey.indexOf('04-客户档案') === 0) {
     html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
     var _custRecs = cat._customerRecords || [];
     if (_custRecs.length > 0) {
@@ -2310,7 +2331,7 @@ async function showCategoryPage(catKey) {
     html += '</div>';
   }
   /* 客户档案分类：直接渲染现有客户档案表格 */
-  if (catKey.indexOf('05-客户档案') === 0) {
+  if (catKey.indexOf('04-客户档案') === 0) {
     var custRecords = cat._customerRecords || [];
     html += '<div class="cp-sub-title">📋 现有客户档案（共 ' + custRecords.length + ' 位客户，点击行查看详情）</div>';
     if (custRecords.length === 0) {
