@@ -8,6 +8,7 @@
 <script src="purify.min.js" defer></script>
 <script src="fuse.min.js" defer></script>
 <script src="crypto-js.min.js" defer></script>
+<script src="assets/china-geo.js" defer></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -1769,6 +1770,13 @@ function showCustomerMap(fromMap) {
     var initLng = restoreState ? restoreState.lng : 104.19;
     var initZoom = restoreState ? restoreState.zoom : 4;
     customerMap = L.map('customerMap', { center: [initLat, initLng], zoom: initZoom });
+    /* 离线底图：中国省级轮廓（始终加载做兜底；联网时高德瓦片会盖在上方） */
+    if (window.CHINA_GEO) {
+      L.geoJSON(window.CHINA_GEO, {
+        style: { color: '#94a3b8', weight: 1, fillColor: '#eef2f7', fillOpacity: 0.9 }
+      }).addTo(customerMap);
+    }
+    /* 在线瓦片：高德街道图（联网显示，离线空白自动露出下方中国轮廓） */
     L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
       subdomains: '1234',
       maxZoom: 18,
