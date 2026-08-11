@@ -202,7 +202,7 @@ body {
 .cp-action-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
   background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
-  font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; margin-bottom: 20px;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; margin-bottom: 20px; margin-right: 10px;
 }
 .cp-action-btn:hover { background: #1d4ed8; }
 /* 客户档案表格 */
@@ -237,11 +237,13 @@ body {
 .loc-map-tip { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; padding: 6px 10px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; }
 .loc-btn-blue { background: #2563eb; }
 .loc-btn-blue:hover { background: #1d4ed8; }
-/* 客户地图视图 */
+/* 客户分布区域图 */
 .cust-map-wrap { width: 100%; height: 600px; border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; position: relative; z-index: 1; margin-bottom: 14px; }
 .cust-map-legend { display: flex; gap: 18px; align-items: center; font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
 .cust-map-legend .lg-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 .cust-map-nocoord { margin-top: 14px; padding: 12px 16px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; font-size: 13px; color: #92400e; }
+.cust-cluster-icon { background: none !important; border: none !important; }
+.cust-cluster-badge { width: 36px; height: 36px; border-radius: 50%; background: #6366f1; border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.3); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700; }
 /* 密码弹窗 */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
@@ -1448,14 +1450,24 @@ function destroyMap() {
   destroyCustomerMap();
 }
 
-/* ===== 客户档案地图视图 ===== */
+/* ===== 客户分布区域图 ===== */
 var customerMap = null;
+var customerMapState = null; /* 保存地图中心/缩放，用于从详情页返回时恢复 */
 
 function destroyCustomerMap() {
   if (customerMap) {
     customerMap.remove();
     customerMap = null;
   }
+}
+
+/* 从地图弹窗点击"查看详情"时，先保存地图状态再跳转 */
+function openDetailFromMap(index) {
+  if (customerMap) {
+    var c = customerMap.getCenter();
+    customerMapState = { lat: c.lat, lng: c.lng, zoom: customerMap.getZoom() };
+  }
+  showCustomerDetail(index);
 }
 
 function initLocationMap(lat, lng, zoom) {
@@ -1616,6 +1628,7 @@ function showCustomerTable() {
     return;
   }
   destroyMap();
+  customerMapState = null;
   var cat = kbData.categories['05-客户档案'];
   var records = (cat && cat._customerRecords) || [];
   currentFile = null;
@@ -1625,7 +1638,7 @@ function showCustomerTable() {
   var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📋</div><div><div class="cp-title">现有客户档案</div><div class="cp-count">共 ' + records.length + ' 位客户（点击行查看详情）</div></div></div>';
   html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
   if (records.length > 0) {
-    html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 地图视图</button>';
+    html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 客户分布区域图</button>';
     html += '<div style="margin-bottom:14px"><input type="text" id="custSearchInput" placeholder="🔍 搜索客户名称 / 业务经理 / 代理商..." oninput="filterCustomerTable(this.value)" style="width:100%;max-width:400px;padding:9px 14px;border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none;transition:border .2s"></div>';
   }
   if (records.length === 0) {
@@ -1669,16 +1682,22 @@ function showCustomerDetail(index) {
   var rec = records[index];
   if (!rec) return;
   destroyMap();
-  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + escapeHtml(rec.customerName || '') + '</span>';
-  document.getElementById('topbarActions').innerHTML = '<button onclick="editCustomer(' + index + ')">✏️ 编辑</button><button onclick="showCustomerTable()">返回列表</button>';
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / ' + (customerMapState ? '客户分布区域图' : '现有客户档案') + ' / <span>' + escapeHtml(rec.customerName || '') + '</span>';
+  var topbar = '<button onclick="editCustomer(' + index + ')">✏️ 编辑</button>';
+  if (customerMapState) {
+    topbar += '<button onclick="showCustomerMap(true)">🗺️ 返回地图</button>';
+  } else {
+    topbar += '<button onclick="showCustomerTable()">返回列表</button>';
+  }
+  document.getElementById('topbarActions').innerHTML = topbar;
   document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + safeHtml(marked.parse(generateCustomerMd(rec))) + '</div>';
   document.getElementById('contentWrap').scrollTop = 0;
 }
 
-/* ===== 客户地图视图 ===== */
-function showCustomerMap() {
+/* ===== 客户分布区域图 ===== */
+function showCustomerMap(fromMap) {
   if (isProtected('05-客户档案') && !unlocked) {
-    requireUnlock('05-客户档案', function() { showCustomerMap(); });
+    requireUnlock('05-客户档案', function() { showCustomerMap(fromMap); });
     return;
   }
   destroyMap();
@@ -1686,7 +1705,7 @@ function showCustomerMap() {
   var records = (cat && cat._customerRecords) || [];
   currentFile = null;
   renderSidebar();
-  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 地图视图';
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 客户分布区域图';
   document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">📋 返回列表</button>';
 
   var geoList = [];
@@ -1703,7 +1722,7 @@ function showCustomerMap() {
   }
 
   var html = '<div class="category-page">';
-  html += '<div class="cp-header"><div class="cp-icon">🗺️</div><div><div class="cp-title">客户地图分布</div><div class="cp-count">共 ' + records.length + ' 位客户';
+  html += '<div class="cp-header"><div class="cp-icon">🗺️</div><div><div class="cp-title">客户分布区域图</div><div class="cp-count">共 ' + records.length + ' 位客户';
   if (geoList.length < records.length) html += '，' + geoList.length + ' 位已标注，' + noCoordList.length + ' 位无坐标';
   html += '</div></div></div>';
   html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
@@ -1719,6 +1738,7 @@ function showCustomerMap() {
   html += '<div class="cust-map-legend">';
   html += '<span><span class="lg-dot" style="background:#10b981"></span>已成交</span>';
   html += '<span><span class="lg-dot" style="background:#f59e0b"></span>潜在</span>';
+  html += '<span><span class="lg-dot" style="background:#6366f1"></span>重叠区域</span>';
   html += '<span style="margin-left:auto;color:var(--text-secondary)">点击标记查看客户信息</span>';
   html += '</div>';
   html += '<div class="cust-map-wrap" id="customerMap"></div>';
@@ -1736,12 +1756,19 @@ function showCustomerMap() {
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
 
+  /* 保存恢复状态（从详情页返回时用），然后清除 */
+  var restoreState = (fromMap && customerMapState) ? customerMapState : null;
+  if (!fromMap) customerMapState = null;
+
   /* 初始化地图 */
   loadLeaflet(function() {
     var mapEl = document.getElementById('customerMap');
     if (!mapEl) return;
     mapEl.innerHTML = '';
-    customerMap = L.map('customerMap', { center: [35.86, 104.19], zoom: 4 });
+    var initLat = restoreState ? restoreState.lat : 35.86;
+    var initLng = restoreState ? restoreState.lng : 104.19;
+    var initZoom = restoreState ? restoreState.zoom : 4;
+    customerMap = L.map('customerMap', { center: [initLat, initLng], zoom: initZoom });
     L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
       subdomains: '1234',
       maxZoom: 18,
@@ -1749,39 +1776,87 @@ function showCustomerMap() {
       attribution: '&copy; 高德地图'
     }).addTo(customerMap);
 
-    var markers = [];
-    for (var g = 0; g < geoList.length; g++) {
-      (function(item) {
-        var isDealt = (item.rec.dealStatus || '').indexOf('已成交') >= 0;
-        var color = isDealt ? '#10b981' : '#f59e0b';
-        var marker = L.circleMarker([item.lat, item.lng], {
-          radius: 10,
-          fillColor: color,
-          color: '#fff',
-          weight: 2,
-          opacity: 1,
-          fillOpacity: 0.85
-        }).addTo(customerMap);
-
-        var popupHtml = '<div style="min-width:200px;max-width:280px">'
-          + '<div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:6px">🏭 ' + escapeHtml(item.rec.customerName || '') + '</div>'
-          + '<div style="font-size:12px;color:#64748b;margin-bottom:4px">📍 ' + escapeHtml((item.rec.marketRegion || '') + ' · ' + (item.rec.address || '')) + '</div>'
-          + '<div style="font-size:12px;color:#64748b;margin-bottom:8px">📊 ' + escapeHtml((item.rec.dealStatus || '') + ' · ' + (item.rec.customerType || '')) + '</div>'
-          + '<button onclick="showCustomerDetail(' + item.idx + ')" style="width:100%;padding:6px 12px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">查看详情 →</button>'
-          + '</div>';
-        marker.bindPopup(popupHtml);
-        markers.push(marker);
-      })(geoList[g]);
+    /* 距离聚类：把相近的客户归为一组 */
+    var CLUSTER_DIST = 0.02; /* 约2km */
+    var used = new Array(geoList.length).fill(false);
+    var clusters = [];
+    for (var ci = 0; ci < geoList.length; ci++) {
+      if (used[ci]) continue;
+      var group = [geoList[ci]];
+      used[ci] = true;
+      for (var cj = 0; cj < geoList.length; cj++) {
+        if (used[cj]) continue;
+        var dist = Math.sqrt(Math.pow(geoList[ci].lat - geoList[cj].lat, 2) + Math.pow(geoList[ci].lng - geoList[cj].lng, 2));
+        if (dist <= CLUSTER_DIST) { group.push(geoList[cj]); used[cj] = true; }
+      }
+      clusters.push(group);
     }
 
-    /* 自动适配视野到所有标记 */
-    if (markers.length === 1) {
-      customerMap.setView([geoList[0].lat, geoList[0].lng], 10);
-    } else if (markers.length > 1) {
-      var group = L.featureGroup(markers);
-      customerMap.fitBounds(group.getBounds(), { padding: [50, 50] });
+    var allMarkers = [];
+    for (var c = 0; c < clusters.length; c++) {
+      (function(cluster) {
+        var sumLat = 0, sumLng = 0;
+        for (var m = 0; m < cluster.length; m++) { sumLat += cluster[m].lat; sumLng += cluster[m].lng; }
+        var cLat = sumLat / cluster.length;
+        var cLng = sumLng / cluster.length;
+
+        if (cluster.length === 1) {
+          /* 单个客户：圆形标记，按成交状态着色 */
+          var item = cluster[0];
+          var isDealt = (item.rec.dealStatus || '').indexOf('已成交') >= 0;
+          var color = isDealt ? '#10b981' : '#f59e0b';
+          var marker = L.circleMarker([item.lat, item.lng], {
+            radius: 10, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
+          }).addTo(customerMap);
+          marker.bindPopup(buildCustPopup(item));
+          allMarkers.push(marker);
+        } else {
+          /* 多个客户重叠：聚合标记，显示数量 */
+          var clusterMarker = L.marker([cLat, cLng], {
+            icon: L.divIcon({
+              className: 'cust-cluster-icon',
+              html: '<div class="cust-cluster-badge">' + cluster.length + '</div>',
+              iconSize: [36, 36], iconAnchor: [18, 18]
+            })
+          }).addTo(customerMap);
+
+          var popupHtml = '<div style="min-width:220px;max-width:320px;max-height:260px;overflow-y:auto">';
+          popupHtml += '<div style="font-weight:600;font-size:13px;color:#6366f1;margin-bottom:8px">📍 此区域有 ' + cluster.length + ' 位客户</div>';
+          for (var k = 0; k < cluster.length; k++) {
+            (function(it) {
+              popupHtml += '<div style="padding:6px 8px;margin-bottom:4px;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="openDetailFromMap(' + it.idx + ')">';
+              popupHtml += '<div style="font-weight:600;font-size:13px;color:#1e293b">' + escapeHtml(it.rec.customerName || '') + '</div>';
+              popupHtml += '<div style="font-size:11px;color:#64748b">' + escapeHtml((it.rec.dealStatus || '') + ' · ' + (it.rec.customerType || '')) + '</div>';
+              popupHtml += '</div>';
+            })(cluster[k]);
+          }
+          popupHtml += '</div>';
+          clusterMarker.bindPopup(popupHtml);
+          allMarkers.push(clusterMarker);
+        }
+      })(clusters[c]);
+    }
+
+    /* 首次打开自动适配视野；从详情页返回则保持原状态 */
+    if (!restoreState && allMarkers.length > 0) {
+      if (allMarkers.length === 1) {
+        customerMap.setView([geoList[0].lat, geoList[0].lng], 10);
+      } else {
+        var group = L.featureGroup(allMarkers);
+        customerMap.fitBounds(group.getBounds(), { padding: [50, 50] });
+      }
     }
   });
+}
+
+/* 构建单个客户弹窗 HTML */
+function buildCustPopup(item) {
+  return '<div style="min-width:200px;max-width:280px">'
+    + '<div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:6px">🏭 ' + escapeHtml(item.rec.customerName || '') + '</div>'
+    + '<div style="font-size:12px;color:#64748b;margin-bottom:4px">📍 ' + escapeHtml((item.rec.marketRegion || '') + ' · ' + (item.rec.address || '')) + '</div>'
+    + '<div style="font-size:12px;color:#64748b;margin-bottom:8px">📊 ' + escapeHtml((item.rec.dealStatus || '') + ' · ' + (item.rec.customerType || '')) + '</div>'
+    + '<button onclick="openDetailFromMap(' + item.idx + ')" style="width:100%;padding:6px 12px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">查看详情 →</button>'
+    + '</div>';
 }
 
 /* ===== 删除客户档案 ===== */
@@ -2174,7 +2249,7 @@ async function showCategoryPage(catKey) {
     html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
     var _custRecs = cat._customerRecords || [];
     if (_custRecs.length > 0) {
-      html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 地图视图</button>';
+      html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 客户分布区域图</button>';
     }
   }
   var directFiles = allFiles.filter(function(x) { return !x.sub; });
