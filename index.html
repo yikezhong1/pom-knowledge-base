@@ -1776,74 +1776,102 @@ function showCustomerMap(fromMap) {
       attribution: '&copy; 高德地图'
     }).addTo(customerMap);
 
-    /* 距离聚类：把相近的客户归为一组 */
-    var CLUSTER_DIST = 0.02; /* 约2km */
-    var used = new Array(geoList.length).fill(false);
-    var clusters = [];
-    for (var ci = 0; ci < geoList.length; ci++) {
-      if (used[ci]) continue;
-      var group = [geoList[ci]];
-      used[ci] = true;
-      for (var cj = 0; cj < geoList.length; cj++) {
-        if (used[cj]) continue;
-        var dist = Math.sqrt(Math.pow(geoList[ci].lat - geoList[cj].lat, 2) + Math.pow(geoList[ci].lng - geoList[cj].lng, 2));
-        if (dist <= CLUSTER_DIST) { group.push(geoList[cj]); used[cj] = true; }
+    /* 动态聚类：基于像素距离，缩放时自动展开/聚合 */
+    var OVERLAP_PX = 26; /* 标记直径20px + 6px间距 */
+    var markersLayer = L.layerGroup().addTo(customerMap);
+
+    function renderMarkers() {
+      markersLayer.clearLayers();
+
+      /* 将所有客户坐标转为当前缩放级别下的像素坐标 */
+      var pts = [];
+      for (var i = 0; i < geoList.length; i++) {
+        var px = customerMap.latLngToLayerPoint(L.latLng(geoList[i].lat, geoList[i].lng));
+        pts.push({ item: geoList[i], x: px.x, y: px.y });
       }
-      clusters.push(group);
-    }
 
-    var allMarkers = [];
-    for (var c = 0; c < clusters.length; c++) {
-      (function(cluster) {
-        var sumLat = 0, sumLng = 0;
-        for (var m = 0; m < cluster.length; m++) { sumLat += cluster[m].lat; sumLng += cluster[m].lng; }
-        var cLat = sumLat / cluster.length;
-        var cLng = sumLng / cluster.length;
-
-        if (cluster.length === 1) {
-          /* 单个客户：圆形标记，按成交状态着色 */
-          var item = cluster[0];
-          var isDealt = (item.rec.dealStatus || '').indexOf('已成交') >= 0;
-          var color = isDealt ? '#10b981' : '#f59e0b';
-          var marker = L.circleMarker([item.lat, item.lng], {
-            radius: 10, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
-          }).addTo(customerMap);
-          marker.bindPopup(buildCustPopup(item));
-          allMarkers.push(marker);
-        } else {
-          /* 多个客户重叠：聚合标记，显示数量 */
-          var clusterMarker = L.marker([cLat, cLng], {
-            icon: L.divIcon({
-              className: 'cust-cluster-icon',
-              html: '<div class="cust-cluster-badge">' + cluster.length + '</div>',
-              iconSize: [36, 36], iconAnchor: [18, 18]
-            })
-          }).addTo(customerMap);
-
-          var popupHtml = '<div style="min-width:220px;max-width:320px;max-height:260px;overflow-y:auto">';
-          popupHtml += '<div style="font-weight:600;font-size:13px;color:#6366f1;margin-bottom:8px">📍 此区域有 ' + cluster.length + ' 位客户</div>';
-          for (var k = 0; k < cluster.length; k++) {
-            (function(it) {
-              popupHtml += '<div style="padding:6px 8px;margin-bottom:4px;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="openDetailFromMap(' + it.idx + ')">';
-              popupHtml += '<div style="font-weight:600;font-size:13px;color:#1e293b">' + escapeHtml(it.rec.customerName || '') + '</div>';
-              popupHtml += '<div style="font-size:11px;color:#64748b">' + escapeHtml((it.rec.dealStatus || '') + ' · ' + (it.rec.customerType || '')) + '</div>';
-              popupHtml += '</div>';
-            })(cluster[k]);
+      /* 按像素距离聚类（传递闭包：A重叠B、B重叠C → 同组） */
+      var used = new Array(pts.length).fill(false);
+      var clusters = [];
+      for (var i = 0; i < pts.length; i++) {
+        if (used[i]) continue;
+        var group = [pts[i]];
+        used[i] = true;
+        for (var j = 0; j < pts.length; j++) {
+          if (used[j]) continue;
+          for (var g = 0; g < group.length; g++) {
+            var dx = group[g].x - pts[j].x;
+            var dy = group[g].y - pts[j].y;
+            if (Math.sqrt(dx * dx + dy * dy) <= OVERLAP_PX) {
+              group.push(pts[j]);
+              used[j] = true;
+              break;
+            }
           }
-          popupHtml += '</div>';
-          clusterMarker.bindPopup(popupHtml);
-          allMarkers.push(clusterMarker);
         }
-      })(clusters[c]);
+        clusters.push(group);
+      }
+
+      /* 渲染每个聚类 */
+      for (var c = 0; c < clusters.length; c++) {
+        (function(cluster) {
+          var sumLat = 0, sumLng = 0;
+          for (var m = 0; m < cluster.length; m++) { sumLat += cluster[m].item.lat; sumLng += cluster[m].item.lng; }
+          var cLat = sumLat / cluster.length;
+          var cLng = sumLng / cluster.length;
+
+          if (cluster.length === 1) {
+            /* 单个客户：圆形标记，按成交状态着色 */
+            var item = cluster[0].item;
+            var isDealt = (item.rec.dealStatus || '').indexOf('已成交') >= 0;
+            var color = isDealt ? '#10b981' : '#f59e0b';
+            var marker = L.circleMarker([item.lat, item.lng], {
+              radius: 10, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
+            });
+            marker.bindPopup(buildCustPopup(item));
+            markersLayer.addLayer(marker);
+          } else {
+            /* 多个客户重叠：聚合标记，显示数量 */
+            var clusterMarker = L.marker([cLat, cLng], {
+              icon: L.divIcon({
+                className: 'cust-cluster-icon',
+                html: '<div class="cust-cluster-badge">' + cluster.length + '</div>',
+                iconSize: [36, 36], iconAnchor: [18, 18]
+              })
+            });
+
+            var popupHtml = '<div style="min-width:220px;max-width:320px;max-height:260px;overflow-y:auto">';
+            popupHtml += '<div style="font-weight:600;font-size:13px;color:#6366f1;margin-bottom:8px">📍 此区域有 ' + cluster.length + ' 位客户</div>';
+            for (var k = 0; k < cluster.length; k++) {
+              (function(it) {
+                popupHtml += '<div style="padding:6px 8px;margin-bottom:4px;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="openDetailFromMap(' + it.idx + ')">';
+                popupHtml += '<div style="font-weight:600;font-size:13px;color:#1e293b">' + escapeHtml(it.rec.customerName || '') + '</div>';
+                popupHtml += '<div style="font-size:11px;color:#64748b">' + escapeHtml((it.rec.dealStatus || '') + ' · ' + (it.rec.customerType || '')) + '</div>';
+                popupHtml += '</div>';
+              })(cluster[k].item);
+            }
+            popupHtml += '</div>';
+            clusterMarker.bindPopup(popupHtml);
+            markersLayer.addLayer(clusterMarker);
+          }
+        })(clusters[c]);
+      }
     }
+
+    /* 初次渲染 + 缩放时重新聚类（先注册监听再 fitBounds，确保不遗漏缩放事件） */
+    renderMarkers();
+    customerMap.on('zoomend', renderMarkers);
 
     /* 首次打开自动适配视野；从详情页返回则保持原状态 */
-    if (!restoreState && allMarkers.length > 0) {
-      if (allMarkers.length === 1) {
+    if (!restoreState && geoList.length > 0) {
+      var tmpMarkers = [];
+      for (var ti = 0; ti < geoList.length; ti++) {
+        tmpMarkers.push(L.marker([geoList[ti].lat, geoList[ti].lng]));
+      }
+      if (tmpMarkers.length === 1) {
         customerMap.setView([geoList[0].lat, geoList[0].lng], 10);
       } else {
-        var group = L.featureGroup(allMarkers);
-        customerMap.fitBounds(group.getBounds(), { padding: [50, 50] });
+        customerMap.fitBounds(L.featureGroup(tmpMarkers).getBounds(), { padding: [50, 50] });
       }
     }
   });
