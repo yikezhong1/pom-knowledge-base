@@ -1770,10 +1770,14 @@ function showCustomerMap(fromMap) {
     var initLng = restoreState ? restoreState.lng : 104.19;
     var initZoom = restoreState ? restoreState.zoom : 4;
     customerMap = L.map('customerMap', { center: [initLat, initLng], zoom: initZoom });
-    /* 离线底图：中国省级轮廓（始终加载做兜底；联网时高德瓦片会盖在上方） */
+    /* 离线底图：中国省级轮廓（放自定义 pane chinaBase zIndex=100，瓦片 tilePane=200、vector overlayPane=400，
+       这样联网时高德瓦片盖在底图之上显示清晰街道；离线时瓦片空白才露出底图做兜底） */
     if (window.CHINA_GEO) {
+      customerMap.createPane('chinaBase');
+      customerMap.getPane('chinaBase').style.zIndex = 100;
       L.geoJSON(window.CHINA_GEO, {
-        style: { color: '#94a3b8', weight: 1, fillColor: '#eef2f7', fillOpacity: 0.9 }
+        pane: 'chinaBase',
+        style: { color: '#cbd5e1', weight: 0.8, fillColor: '#f8fafc', fillOpacity: 0.85 }
       }).addTo(customerMap);
     }
     /* 在线瓦片：高德街道图（联网显示，离线空白自动露出下方中国轮廓） */
