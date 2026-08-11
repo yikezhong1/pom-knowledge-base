@@ -237,6 +237,11 @@ body {
 .loc-map-tip { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; padding: 6px 10px; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; }
 .loc-btn-blue { background: #2563eb; }
 .loc-btn-blue:hover { background: #1d4ed8; }
+/* 客户地图视图 */
+.cust-map-wrap { width: 100%; height: 600px; border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; position: relative; z-index: 1; margin-bottom: 14px; }
+.cust-map-legend { display: flex; gap: 18px; align-items: center; font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+.cust-map-legend .lg-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.cust-map-nocoord { margin-top: 14px; padding: 12px 16px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; font-size: 13px; color: #92400e; }
 /* 密码弹窗 */
 .pw-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
@@ -1158,6 +1163,7 @@ async function openFile(category, filename, subfolder) {
     return;
   }
   await ensureCategory(category);
+  destroyMap();
   currentFile = { category: category, filename: filename, subfolder: subfolder || '' };
   /* 更新 URL 哈希，支持分享/收藏/前进后退 */
   var hashPath = '#/' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
@@ -1439,6 +1445,17 @@ function destroyMap() {
     locationMap = null;
     locationMarker = null;
   }
+  destroyCustomerMap();
+}
+
+/* ===== 客户档案地图视图 ===== */
+var customerMap = null;
+
+function destroyCustomerMap() {
+  if (customerMap) {
+    customerMap.remove();
+    customerMap = null;
+  }
 }
 
 function initLocationMap(lat, lng, zoom) {
@@ -1608,6 +1625,7 @@ function showCustomerTable() {
   var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📋</div><div><div class="cp-title">现有客户档案</div><div class="cp-count">共 ' + records.length + ' 位客户（点击行查看详情）</div></div></div>';
   html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
   if (records.length > 0) {
+    html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 地图视图</button>';
     html += '<div style="margin-bottom:14px"><input type="text" id="custSearchInput" placeholder="🔍 搜索客户名称 / 业务经理 / 代理商..." oninput="filterCustomerTable(this.value)" style="width:100%;max-width:400px;padding:9px 14px;border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none;transition:border .2s"></div>';
   }
   if (records.length === 0) {
@@ -1650,10 +1668,120 @@ function showCustomerDetail(index) {
   var records = (cat && cat._customerRecords) || [];
   var rec = records[index];
   if (!rec) return;
+  destroyMap();
   document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 现有客户档案 / <span>' + escapeHtml(rec.customerName || '') + '</span>';
   document.getElementById('topbarActions').innerHTML = '<button onclick="editCustomer(' + index + ')">✏️ 编辑</button><button onclick="showCustomerTable()">返回列表</button>';
   document.getElementById('contentWrap').innerHTML = '<div class="md-content">' + safeHtml(marked.parse(generateCustomerMd(rec))) + '</div>';
   document.getElementById('contentWrap').scrollTop = 0;
+}
+
+/* ===== 客户地图视图 ===== */
+function showCustomerMap() {
+  if (isProtected('05-客户档案') && !unlocked) {
+    requireUnlock('05-客户档案', function() { showCustomerMap(); });
+    return;
+  }
+  destroyMap();
+  var cat = kbData.categories['05-客户档案'];
+  var records = (cat && cat._customerRecords) || [];
+  currentFile = null;
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '👥 <span>客户档案</span> / 地图视图';
+  document.getElementById('topbarActions').innerHTML = '<button onclick="showCustomerTable()">📋 返回列表</button>';
+
+  var geoList = [];
+  var noCoordList = [];
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i];
+    var coord = (rec.coordinates || '').trim();
+    var parts = coord.split(',');
+    if (parts.length === 2 && parts[0] && parts[1] && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
+      geoList.push({ idx: i, lat: parseFloat(parts[0]), lng: parseFloat(parts[1]), rec: rec });
+    } else {
+      noCoordList.push({ idx: i, rec: rec });
+    }
+  }
+
+  var html = '<div class="category-page">';
+  html += '<div class="cp-header"><div class="cp-icon">🗺️</div><div><div class="cp-title">客户地图分布</div><div class="cp-count">共 ' + records.length + ' 位客户';
+  if (geoList.length < records.length) html += '，' + geoList.length + ' 位已标注，' + noCoordList.length + ' 位无坐标';
+  html += '</div></div></div>';
+  html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
+
+  if (geoList.length === 0) {
+    html += '<div style="text-align:center;padding:60px 20px;color:var(--text-secondary)"><div style="font-size:48px;margin-bottom:16px">📭</div><p>暂无客户坐标数据，无法显示地图。请先填报客户档案并填写经纬度。</p></div>';
+    html += '</div>';
+    document.getElementById('contentWrap').innerHTML = html;
+    document.getElementById('contentWrap').scrollTop = 0;
+    return;
+  }
+
+  html += '<div class="cust-map-legend">';
+  html += '<span><span class="lg-dot" style="background:#10b981"></span>已成交</span>';
+  html += '<span><span class="lg-dot" style="background:#f59e0b"></span>潜在</span>';
+  html += '<span style="margin-left:auto;color:var(--text-secondary)">点击标记查看客户信息</span>';
+  html += '</div>';
+  html += '<div class="cust-map-wrap" id="customerMap"></div>';
+
+  if (noCoordList.length > 0) {
+    html += '<div class="cust-map-nocoord"><strong>⚠️ 以下 ' + noCoordList.length + ' 位客户无坐标，未在地图标注：</strong><br>';
+    for (var n = 0; n < noCoordList.length; n++) {
+      var nr = noCoordList[n].rec;
+      html += '<span style="cursor:pointer;color:#1d4ed8;text-decoration:underline" onclick="showCustomerDetail(' + noCoordList[n].idx + ')">' + escapeHtml(nr.customerName || ('客户' + (noCoordList[n].idx + 1))) + '</span>';
+      if (n < noCoordList.length - 1) html += '、';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById('contentWrap').innerHTML = html;
+  document.getElementById('contentWrap').scrollTop = 0;
+
+  /* 初始化地图 */
+  loadLeaflet(function() {
+    var mapEl = document.getElementById('customerMap');
+    if (!mapEl) return;
+    mapEl.innerHTML = '';
+    customerMap = L.map('customerMap', { center: [35.86, 104.19], zoom: 4 });
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+      subdomains: '1234',
+      maxZoom: 18,
+      errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      attribution: '&copy; 高德地图'
+    }).addTo(customerMap);
+
+    var markers = [];
+    for (var g = 0; g < geoList.length; g++) {
+      (function(item) {
+        var isDealt = (item.rec.dealStatus || '').indexOf('已成交') >= 0;
+        var color = isDealt ? '#10b981' : '#f59e0b';
+        var marker = L.circleMarker([item.lat, item.lng], {
+          radius: 10,
+          fillColor: color,
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.85
+        }).addTo(customerMap);
+
+        var popupHtml = '<div style="min-width:200px;max-width:280px">'
+          + '<div style="font-weight:600;font-size:14px;color:#1e293b;margin-bottom:6px">🏭 ' + escapeHtml(item.rec.customerName || '') + '</div>'
+          + '<div style="font-size:12px;color:#64748b;margin-bottom:4px">📍 ' + escapeHtml((item.rec.marketRegion || '') + ' · ' + (item.rec.address || '')) + '</div>'
+          + '<div style="font-size:12px;color:#64748b;margin-bottom:8px">📊 ' + escapeHtml((item.rec.dealStatus || '') + ' · ' + (item.rec.customerType || '')) + '</div>'
+          + '<button onclick="showCustomerDetail(' + item.idx + ')" style="width:100%;padding:6px 12px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">查看详情 →</button>'
+          + '</div>';
+        marker.bindPopup(popupHtml);
+        markers.push(marker);
+      })(geoList[g]);
+    }
+
+    /* 自动适配视野到所有标记 */
+    if (markers.length === 1) {
+      customerMap.setView([geoList[0].lat, geoList[0].lng], 10);
+    } else if (markers.length > 1) {
+      var group = L.featureGroup(markers);
+      customerMap.fitBounds(group.getBounds(), { padding: [50, 50] });
+    }
+  });
 }
 
 /* ===== 删除客户档案 ===== */
@@ -2026,6 +2154,7 @@ async function showCategoryPage(catKey) {
   await ensureCategory(catKey);
   var cat = kbData.categories[catKey];
   if (!cat) return;
+  destroyMap();
   currentFile = null;
   openCats.add(cat.label);
   renderSidebar();
@@ -2043,6 +2172,10 @@ async function showCategoryPage(catKey) {
   /* 客户档案分类：添加在线填报按钮 */
   if (catKey.indexOf('05-客户档案') === 0) {
     html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
+    var _custRecs = cat._customerRecords || [];
+    if (_custRecs.length > 0) {
+      html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 地图视图</button>';
+    }
   }
   var directFiles = allFiles.filter(function(x) { return !x.sub; });
   if (directFiles.length > 0) {
