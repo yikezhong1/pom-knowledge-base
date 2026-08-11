@@ -425,7 +425,7 @@ body {
   <div class="topbar">
     <button class="menu-btn" onclick="toggleSidebar()" aria-label="菜单">☰</button>
     <div class="breadcrumb" id="breadcrumb">知识库首页</div>
-    <button class="sync-btn" id="syncOnlineBtn" onclick="syncOnlineCustomers()" title="从线上 GitHub 拉取最新客户档案同步到本地">🔄 同步线上内容</button>
+    <button class="sync-btn" id="syncOnlineBtn" onclick="syncOnlineCustomers()" title="从线上 GitHub 拉取最新客户档案同步到本地" style="display:none">🔄 同步线上内容</button>
     <div class="topbar-actions" id="topbarActions"></div>
   </div>
   <div class="content-wrap" id="contentWrap">
@@ -717,8 +717,17 @@ async function ensureCategory(catKey) {
   }
 }
 
+/* 判断当前是否为线下环境（本地服务 / 本地文件），只有线下才显示「同步线上内容」按钮 */
+function shouldShowSyncButton() {
+  var h = location.hostname.toLowerCase();
+  if (h === 'localhost' || h === '127.0.0.1' || location.protocol === 'file:') return true;
+  return false;
+}
+
 async function init() {
   try {
+    var syncBtn = document.getElementById('syncOnlineBtn');
+    if (syncBtn && shouldShowSyncButton()) syncBtn.style.display = '';
     var res = await fetch('data-index.json');
     kbData = await res.json();
     loadedCats = {};
