@@ -2327,90 +2327,85 @@ async function showCategoryPage(catKey) {
   }
       /* 05-行情与行业：文件夹整体置顶（content area 同样先文件夹组、后报告网格） */
     if (catKey === '05-行情与行业') {
-(cat.subfolders || []).forEach(function(sub) {
-    var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
-    if (subFiles.length > 0) {
-      html += '<div class="cp-sub-title">📂 ' + sub.name + '</div><div class="cp-file-grid">';
-      subFiles.forEach(function(x) {
-        var sfPath = encodeURIComponent(sub.name);
-        html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'' + sfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
-      });
-      html += '</div>';
-    }
-    (sub.groups || []).forEach(function(g) {
-      if (g.files.length > 0) {
-        html += '<div class="cp-sub-title">📅 ' + sub.name + ' / ' + g.name + '</div><div class="cp-file-grid">';
-        g.files.forEach(function(f) {
-          var gfPath = encodeURIComponent(sub.name + '/' + g.name);
-          html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + f.filename + '\',\'' + gfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + f.name + '</span><span class="cp-ext ' + f.ext + '">' + f.ext + '</span></div>';
+  (cat.subfolders || []).forEach(function(sub) {
+      var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
+      if (subFiles.length > 0) {
+        html += '<div class="cp-sub-title">📂 ' + sub.name + '</div><div class="cp-file-grid">';
+        subFiles.forEach(function(x) {
+          var sfPath = encodeURIComponent(sub.name);
+          html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'' + sfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
         });
         html += '</div>';
       }
+      (sub.groups || []).forEach(function(g) {
+        if (g.files.length > 0) {
+          html += '<div class="cp-sub-title">📅 ' + sub.name + ' / ' + g.name + '</div><div class="cp-file-grid">';
+          g.files.forEach(function(f) {
+            var gfPath = encodeURIComponent(sub.name + '/' + g.name);
+            html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + f.filename + '\',\'' + gfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + f.name + '</span><span class="cp-ext ' + f.ext + '">' + f.ext + '</span></div>';
+          });
+          html += '</div>';
+        }
+      });
     });
-  }
-var directFiles = allFiles.filter(function(x) { return !x.sub; });
-  if (directFiles.length > 0) {
-    html += '<div class="cp-file-grid">';
-    directFiles.forEach(function(x) {
-      html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
-    });
-    html += '</div>';
-  }
-  
-    } else {
-var directFiles = allFiles.filter(function(x) { return !x.sub; });
-  if (directFiles.length > 0) {
-    html += '<div class="cp-file-grid">';
-    directFiles.forEach(function(x) {
-      html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
-    });
-    html += '</div>';
-  }
-  
-/* 客户档案分类：直接渲染现有客户档案表格 */
-  if (catKey.indexOf('04-客户档案') === 0) {
-    var custRecords = cat._customerRecords || [];
-    html += '<div class="cp-sub-title">📋 现有客户档案（共 ' + custRecords.length + ' 位客户，点击行查看详情）</div>';
-    if (custRecords.length === 0) {
-      html += '<div style="text-align:center;padding:40px 20px;color:var(--text-secondary);background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--radius)"><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
-    } else {
-      html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
-      for (var ci = 0; ci < custRecords.length; ci++) {
-        var crec = custRecords[ci];
-        html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
-      }
-      html += '</tbody></table></div>';
-    }
-    html += '</div>';
-    document.getElementById('contentWrap').innerHTML = html;
-    document.getElementById('contentWrap').scrollTop = 0;
-    return;
-  }
-  
-(cat.subfolders || []).forEach(function(sub) {
-    var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
-    if (subFiles.length > 0) {
-      html += '<div class="cp-sub-title">📂 ' + sub.name + '</div><div class="cp-file-grid">';
-      subFiles.forEach(function(x) {
-        var sfPath = encodeURIComponent(sub.name);
-        html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'' + sfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
+  var directFiles = allFiles.filter(function(x) { return !x.sub; });
+    if (directFiles.length > 0) {
+      html += '<div class="cp-file-grid">';
+      directFiles.forEach(function(x) {
+        html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
       });
       html += '</div>';
     }
-    (sub.groups || []).forEach(function(g) {
-      if (g.files.length > 0) {
-        html += '<div class="cp-sub-title">📅 ' + sub.name + ' / ' + g.name + '</div><div class="cp-file-grid">';
-        g.files.forEach(function(f) {
-          var gfPath = encodeURIComponent(sub.name + '/' + g.name);
-          html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + f.filename + '\',\'' + gfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + f.name + '</span><span class="cp-ext ' + f.ext + '">' + f.ext + '</span></div>';
+} else {
+  var directFiles = allFiles.filter(function(x) { return !x.sub; });
+    if (directFiles.length > 0) {
+      html += '<div class="cp-file-grid">';
+      directFiles.forEach(function(x) {
+        html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
+      });
+      html += '</div>';
+    }
+  /* 客户档案分类：直接渲染现有客户档案表格 */
+    if (catKey.indexOf('04-客户档案') === 0) {
+      var custRecords = cat._customerRecords || [];
+      html += '<div class="cp-sub-title">📋 现有客户档案（共 ' + custRecords.length + ' 位客户，点击行查看详情）</div>';
+      if (custRecords.length === 0) {
+        html += '<div style="text-align:center;padding:40px 20px;color:var(--text-secondary);background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--radius)"><p>暂无客户档案，点击上方按钮填报第一个客户</p></div>';
+      } else {
+        html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
+        for (var ci = 0; ci < custRecords.length; ci++) {
+          var crec = custRecords[ci];
+          html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
+        }
+        html += '</tbody></table></div>';
+      }
+      html += '</div>';
+      document.getElementById('contentWrap').innerHTML = html;
+      document.getElementById('contentWrap').scrollTop = 0;
+      return;
+    }
+  (cat.subfolders || []).forEach(function(sub) {
+      var subFiles = allFiles.filter(function(x) { return x.sub === sub.name; });
+      if (subFiles.length > 0) {
+        html += '<div class="cp-sub-title">📂 ' + sub.name + '</div><div class="cp-file-grid">';
+        subFiles.forEach(function(x) {
+          var sfPath = encodeURIComponent(sub.name);
+          html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + x.file.filename + '\',\'' + sfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + x.file.name + '</span><span class="cp-ext ' + x.file.ext + '">' + x.file.ext + '</span></div>';
         });
         html += '</div>';
       }
+      (sub.groups || []).forEach(function(g) {
+        if (g.files.length > 0) {
+          html += '<div class="cp-sub-title">📅 ' + sub.name + ' / ' + g.name + '</div><div class="cp-file-grid">';
+          g.files.forEach(function(f) {
+            var gfPath = encodeURIComponent(sub.name + '/' + g.name);
+            html += '<div class="cp-file-card" onclick="openFile(\'' + catKey + '\',\'' + f.filename + '\',\'' + gfPath + '\')"><span class="cp-dot"></span><span class="cp-name">' + f.name + '</span><span class="cp-ext ' + f.ext + '">' + f.ext + '</span></div>';
+          });
+          html += '</div>';
+        }
+      });
     });
-  }
-    }
-);
-  /* 产品知识分类：文件列表底部追加「学习工具」区块（合并原独立模块） */
+}/* 产品知识分类：文件列表底部追加「学习工具」区块（合并原独立模块） */
   if (catKey === '02-产品知识' && typeof LEARNING_TOOLS !== 'undefined' && LEARNING_TOOLS.length > 0) {
     html += '<div class="cp-sub-title">📚 学习工具</div><div class="cp-file-grid">';
     for (var ti = 0; ti < LEARNING_TOOLS.length; ti++) {
