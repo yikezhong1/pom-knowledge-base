@@ -592,42 +592,11 @@ function requireUnlock(catKey, callback) {
   callback();
 }
 
-/* ===== 学习工具（虚拟分类） ===== */
+/* ===== 学习工具（已合并至「产品知识」分类页底部） ===== */
 var LEARNING_TOOLS = [
   { name: '知识闯关（400题）', url: 'https://yikezhong1.github.io/pom-training/quiz.html', icon: '🧠', desc: '400 道精选题目，测试你的 POM 知识水平' },
   { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' }
 ];
-var TOOLS_CAT_KEY = '学习工具';
-
-function renderToolsCatGroup() {
-  var isOpen = openCats.has(TOOLS_CAT_KEY);
-  var h = '<div class="cat-group"><div class="cat-header' + (isOpen ? ' open' : '') + '" onclick="toggleCat(this)"><span class="icon">📚</span><span>' + TOOLS_CAT_KEY + '</span><span class="count">' + LEARNING_TOOLS.length + '</span><span class="arrow">&#9654;</span></div><div class="cat-files' + (isOpen ? ' open' : '') + '">';
-  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
-    var t = LEARNING_TOOLS[i];
-    h += '<div class="file-item" onclick="window.open(\'' + t.url + '\',\'_blank\')"><span class="dot"></span><span>' + t.name + '</span><span class="ext-badge link">↗</span></div>';
-  }
-  h += '</div></div>';
-  return h;
-}
-
-function showToolsPage() {
-  currentFile = null;
-  openCats.add(TOOLS_CAT_KEY);
-  renderSidebar();
-  document.getElementById('breadcrumb').innerHTML = '📚 <span>学习工具</span>';
-  document.getElementById('topbarActions').innerHTML = '';
-  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📚</div><div><div class="cp-title">学习工具</div><div class="cp-count">POM 培训与学习</div></div></div><div class="cp-file-grid">';
-  for (var i = 0; i < LEARNING_TOOLS.length; i++) {
-    var t = LEARNING_TOOLS[i];
-    html += '<a class="cp-file-card" href="' + t.url + '" target="_blank"><span class="cp-dot"></span><span class="cp-name">' + t.icon + ' ' + t.name + '</span><span class="cp-ext link">↗</span></a>';
-  }
-  html += '</div><div style="margin-top:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8">';
-  for (var j = 0; j < LEARNING_TOOLS.length; j++) {
-    html += '<p>' + LEARNING_TOOLS[j].icon + ' <b>' + LEARNING_TOOLS[j].name + '</b> — ' + LEARNING_TOOLS[j].desc + '</p>';
-  }
-  html += '</div></div>';
-  document.getElementById('contentWrap').innerHTML = html;
-}
 
 /* ===== 在线填报表单定义 ===== */
 var FORM_SECTIONS = [
@@ -1034,7 +1003,6 @@ function renderSidebar(filter) {
   if (!kbData || !kbData.categories) { el.innerHTML = '<div class="loading">无数据</div>'; return; }
   var filterLower = filter.toLowerCase();
   var html = '';
-  var toolsInjected = false;
   for (var catKey in kbData.categories) {
     var cat = kbData.categories[catKey];
     if (filterLower && isProtected(catKey) && !unlocked) continue;
@@ -1097,12 +1065,7 @@ function renderSidebar(filter) {
       html += '</div></div>';
     }
     html += '</div></div>';
-    if (!toolsInjected && catKey.indexOf('02-') === 0) {
-      html += renderToolsCatGroup();
-      toolsInjected = true;
-    }
   }
-  if (!toolsInjected) html += renderToolsCatGroup();
   el.innerHTML = html;
 }
 
@@ -2141,8 +2104,7 @@ function showWelcome() {
       });
     });
   });
-  var catsHtml = '';
-  var toolsCardInjected = false;
+    var catsHtml = '';
   for (var i = 0; i < cats.length; i++) {
     var key = cats[i][0], cat = cats[i][1];
     var catTotal = (cat.files || []).length;
@@ -2154,13 +2116,6 @@ function showWelcome() {
     var lockIcon = isProt ? '<div class="card-lock">🔒 加密</div>' : '';
     var cardCls = 'cat-card' + (isProt ? ' locked' : '');
     catsHtml += '<div class="' + cardCls + '" onclick="onCatCardClick(\'' + key + '\')">' + lockIcon + '<div class="cat-icon">' + cat.icon + '</div><div class="cat-name">' + cat.label + '</div><div class="cat-count">' + catTotal + ' 个文件</div></div>';
-    if (!toolsCardInjected && key.indexOf('02-') === 0) {
-      catsHtml += '<div class="cat-card" onclick="showToolsPage()"><div class="cat-icon">📚</div><div class="cat-name">学习工具</div><div class="cat-count">' + LEARNING_TOOLS.length + ' 个工具</div></div>';
-      toolsCardInjected = true;
-    }
-  }
-  if (!toolsCardInjected) {
-    catsHtml += '<div class="cat-card" onclick="showToolsPage()"><div class="cat-icon">📚</div><div class="cat-name">学习工具</div><div class="cat-count">' + LEARNING_TOOLS.length + ' 个工具</div></div>';
   }
   document.getElementById('breadcrumb').innerHTML = '知识库首页';
   document.getElementById('topbarActions').innerHTML = '';
@@ -2370,6 +2325,19 @@ async function showCategoryPage(catKey) {
       }
     });
   });
+  /* 产品知识分类：文件列表底部追加「学习工具」区块（合并原独立模块） */
+  if (catKey === '02-产品知识' && typeof LEARNING_TOOLS !== 'undefined' && LEARNING_TOOLS.length > 0) {
+    html += '<div class="cp-sub-title">📚 学习工具</div><div class="cp-file-grid">';
+    for (var ti = 0; ti < LEARNING_TOOLS.length; ti++) {
+      var t = LEARNING_TOOLS[ti];
+      html += '<a class="cp-file-card" href="' + t.url + '" target="_blank" rel="noopener" style="text-decoration:none"><span class="cp-dot" style="background:#f59e0b"></span><span class="cp-name">' + t.icon + ' ' + t.name + '</span><span class="cp-ext link">↗</span></a>';
+    }
+    html += '</div><div style="margin-top:14px;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-secondary);font-size:12px;line-height:1.8">';
+    for (var tj = 0; tj < LEARNING_TOOLS.length; tj++) {
+      html += '<p>' + LEARNING_TOOLS[tj].icon + ' <b>' + LEARNING_TOOLS[tj].name + '</b> — ' + LEARNING_TOOLS[tj].desc + '</p>';
+    }
+    html += '</div>';
+  }
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
