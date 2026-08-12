@@ -530,7 +530,7 @@ function buildSearchIndex() {
   for (var catKey in kbData.categories) {
     var cat = kbData.categories[catKey];
     function addDoc(f, subfolder) {
-      if (f.encrypted && !masterKey) return; // 未解锁时不索引敏感分类（含摘要）
+      if (f.encrypted && !unlocked) return; // 未解锁时不索引敏感分类（含摘要）
       var text = f.excerpt || '';
       if (text.length > 200) text = text.slice(0, 200);
       searchDocs.push({
@@ -566,8 +566,8 @@ var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 
 
 /* ===== 密码保护（已取消在线密码；内容构建时加密、前端用内置密钥自动解密，用户无感访问） ===== */
 var PROTECTED_CATS = ['04-客户档案', '05-行情与行业', '06-生产工艺'];
-var unlocked = true;            // 已取消密码门槛，默认解锁
-var masterKey = 'pom2026';      // 内置解密密钥（与 build-static.js MASTER 一致），自动解密受保护分类正文
+var unlocked = false;           // P0-3 整改：敏感分类默认锁定，需用户输入访问口令解锁
+var accessPassword = '';        // P0-3 整改：访问口令不内置源码，由用户输入（与 build-static.js MASTER 一致）
 
 /* 解密构建端加密的内容（与 build-static.js 使用相同 CryptoJS 参数） */
 function decryptText(payload, password) {
@@ -588,8 +588,16 @@ function isProtected(catKey) {
 }
 
 function requireUnlock(catKey, callback) {
-  // 已取消在线密码，直接放行（正文由前端用内置 masterKey 自动解密）
-  callback();
+  if (!isProtected(catKey)) { callback(); return; }
+  if (unlocked) { callback(); return; }
+  var pwd = window.prompt('该分类为加密内容，请输入访问口令：');
+  if (pwd === null) return;            // 用户取消
+  var probe = (kbData && kbData.probe) ? kbData.probe : '';
+  if (!probe) { unlocked = true; accessPassword = pwd; callback(); return; }
+  var t;
+  try { t = decryptText(probe, pwd); } catch (e) { t = ''; }
+  if (t === 'POM_PROBE_OK') { unlocked = true; accessPassword = pwd; callback(); }
+  else { window.alert('口令错误，无法解密该分类。'); }
 }
 
 /* ===== 学习工具（已合并至「产品知识」分类页底部） ===== */
@@ -1160,6 +1168,10 @@ async function openFile(category, filename, subfolder) {
   var catMeta = kbData.categories[category];
   var file = findFileInCat(catMeta, filename, subfolder);
   if (!file) return;
+  if (file.encrypted && !unlocked) {
+    requireUnlock(category, function() { renderFile(category, filename, subfolder); });
+    return;
+  }
   var breadPath = catMeta.icon + ' ' + catMeta.label;
   if (subfolder) breadPath += ' / ' + decodeURIComponent(subfolder).replace(/\//g, ' / ');
   breadPath += ' / <span>' + file.name + '</span>';
@@ -1177,7 +1189,7 @@ async function openFile(category, filename, subfolder) {
   var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
   var htmlToRender = file.html;
   if (file.encrypted) {
-    try { htmlToRender = decryptText(file.html, masterKey); }
+    try { htmlToRender = decryptText(file.html, accessPassword); }
     catch (e) { htmlToRender = '<p style="color:#ef4444">内容解密失败，请刷新页面重试。</p>'; }
   }
   content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(htmlToRender.indexOf('md-content') >= 0 ? htmlToRender : '<div class="md-content">' + htmlToRender + '</div>');
