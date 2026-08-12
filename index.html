@@ -2137,9 +2137,6 @@ function showWelcome() {
     + '<div class="categories-grid">' + catsHtml + '</div>'
     + '<div class="kb-footer">版权所有 2026 · 新疆心连心 / 心瑞 · 共聚甲醛销售知识库</div>'
     + '</div>';
-  if (kbData.readme) {
-    html += '<div style="max-width:860px;margin:30px auto 0"><div class="md-content">' + safeHtml(kbData.readme) + '</div></div>';
-  }
   document.getElementById('contentWrap').innerHTML = html;
 }
 
