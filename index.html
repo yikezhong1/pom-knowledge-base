@@ -30,11 +30,11 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--bg-primary); color: var(--text-primary);
-  height: 100vh; display: flex; overflow: hidden;
+  height: 100vh; height: 100dvh; display: flex; overflow: hidden;
 }
 .sidebar {
   width: 300px; min-width: 300px; background: var(--bg-sidebar);
-  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
 }
 .sidebar-header {
   padding: 20px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.08);
@@ -364,6 +364,8 @@ body {
 .menu-btn:hover { background: var(--bg-sidebar-hover); }
 .sidebar-mask { display: none; }
 @media (max-width: 768px) {
+  body { height: 100vh; height: 100dvh; }
+  .sidebar { height: 100vh; height: 100dvh; }
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
     width: 280px; min-width: 280px;
@@ -374,9 +376,35 @@ body {
   .sidebar-mask { display: none; position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.45); }
   .sidebar-mask.show { display: block; }
   .menu-btn { display: inline-flex; }
-  .content-wrap { padding: 16px; }
+  .topbar { min-height: 48px; padding: 8px 12px; }
+  .breadcrumb { font-size: 13px; }
+  .content-wrap { padding: 14px 14px 110px; }
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
   .form-row { grid-template-columns: 1fr; }
+  .category-page { max-width: 100%; }
+  .category-page .cp-header { flex-wrap: wrap; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; }
+  .category-page .cp-icon { font-size: 28px; }
+  .category-page .cp-title { font-size: 18px; }
+  .cp-action-btn { width: 100%; margin-right: 0; justify-content: center; margin-bottom: 10px; }
+  .customer-table-wrap { -webkit-overflow-scrolling: touch; }
+  .customer-table { min-width: 560px; font-size: 12px; }
+  .customer-table th, .customer-table td { padding: 8px 10px; }
+}
+@media (max-width: 480px) {
+  .content-wrap { padding: 12px 12px 100px; }
+  .customer-table,
+  .customer-table thead,
+  .customer-table tbody,
+  .customer-table th,
+  .customer-table td,
+  .customer-table tr { display: block; }
+  .customer-table thead { position: absolute; top: -9999px; left: -9999px; }
+  .customer-table tr { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); overflow: hidden; }
+  .customer-table td { border: none; border-bottom: 1px solid var(--border); position: relative; padding: 10px 12px 10px 42%; white-space: normal; }
+  .customer-table td:before { position: absolute; top: 10px; left: 12px; width: 38%; font-weight: 600; color: var(--accent); font-size: 12px; content: attr(data-label); }
+  .customer-table td:last-child { border-bottom: 0; padding-left: 12px; }
+  .customer-table .ct-idx { text-align: left; }
+  .customer-table-wrap { border: none; background: transparent; overflow-x: visible; }
 }
 /* ===== 统计面板 ===== */
 .stats-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary); z-index: 300; display: none; overflow-y: auto; }
@@ -1688,13 +1716,13 @@ function showCustomerTable() {
          含 data-search 属性值，防止存储型 XSS 与属性注入 */
       var searchAttr = escapeHtml(((rec.customerName || '') + (rec.businessManager || '') + (rec.agent || '')).toLowerCase());
       html += '<tr data-idx="' + i + '" data-search="' + searchAttr + '" onclick="showCustomerDetail(' + i + ')">'
-            + '<td class="ct-idx">' + (i + 1) + '</td>'
-            + '<td>' + escapeHtml(rec.businessManager || '') + '</td>'
-            + '<td class="ct-name">' + escapeHtml(rec.customerName || '') + '</td>'
-            + '<td>' + escapeHtml(rec.dealStatus || '') + '</td>'
-            + '<td>' + escapeHtml(rec.customerType || '') + '</td>'
-            + '<td>' + escapeHtml(rec.agent || '') + '</td>'
-            + '<td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button>'
+            + '<td class="ct-idx" data-label="序号">' + (i + 1) + '</td>'
+            + '<td data-label="业务经理">' + escapeHtml(rec.businessManager || '') + '</td>'
+            + '<td class="ct-name" data-label="拜访客户名称">' + escapeHtml(rec.customerName || '') + '</td>'
+            + '<td data-label="成交状态">' + escapeHtml(rec.dealStatus || '') + '</td>'
+            + '<td data-label="客户性质">' + escapeHtml(rec.customerType || '') + '</td>'
+            + '<td data-label="所属代理商">' + escapeHtml(rec.agent || '') + '</td>'
+            + '<td data-label="操作"><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button>'
             + '<button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
     }
     html += '</tbody></table></div>';
@@ -2375,7 +2403,7 @@ async function showCategoryPage(catKey) {
         html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
         for (var ci = 0; ci < custRecords.length; ci++) {
           var crec = custRecords[ci];
-          html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
+          html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx" data-label="序号">' + (ci + 1) + '</td><td data-label="业务经理">' + (crec.businessManager || '') + '</td><td class="ct-name" data-label="拜访客户名称">' + (crec.customerName || '') + '</td><td data-label="成交状态">' + (crec.dealStatus || '') + '</td><td data-label="客户性质">' + (crec.customerType || '') + '</td><td data-label="所属代理商">' + (crec.agent || '') + '</td><td data-label="操作"><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
         }
         html += '</tbody></table></div>';
       }
