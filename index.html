@@ -603,6 +603,22 @@ var PROTECTED_CATS = ['04-客户档案', '05-行情与行业', '06-生产工艺'
 var unlocked = false;           // P0-3 整改：敏感分类默认锁定，需用户输入访问口令解锁
 var accessPassword = '';        // P0-3 整改：访问口令不内置源码，由用户输入（与 build-static.js MASTER 一致）
 
+/* 会话级解锁记忆：首次输对口令后写入 sessionStorage，刷新/切分类/新标签均免重输；
+   关闭浏览器（会话结束）后清空，下次打开浏览器需重新输入一次。 */
+var POM_UNLOCK_KEY = 'pom_kb_unlock_v1';
+function pomSaveUnlock() {
+  try { sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, p: accessPassword })); } catch (e) {}
+}
+function pomRestoreUnlock() {
+  try {
+    var s = sessionStorage.getItem(POM_UNLOCK_KEY);
+    if (!s) return;
+    var o = JSON.parse(s);
+    if (o && o.u) { unlocked = true; accessPassword = o.p || ''; }
+  } catch (e) {}
+}
+pomRestoreUnlock();
+
 /* 解密构建端加密的内容（与 build-static.js 使用相同 CryptoJS 参数） */
 function decryptText(payload, password) {
   if (typeof payload !== 'string' || payload.indexOf('ENC:') !== 0) return payload;
@@ -627,10 +643,10 @@ function requireUnlock(catKey, callback) {
   var pwd = window.prompt('该分类为加密内容，请输入访问口令：');
   if (pwd === null) return;            // 用户取消
   var probe = (kbData && kbData.probe) ? kbData.probe : '';
-  if (!probe) { unlocked = true; accessPassword = pwd; callback(); return; }
+  if (!probe) { unlocked = true; accessPassword = pwd; pomSaveUnlock(); callback(); return; }
   var t;
   try { t = decryptText(probe, pwd); } catch (e) { t = ''; }
-  if (t === 'POM_PROBE_OK') { unlocked = true; accessPassword = pwd; callback(); }
+  if (t === 'POM_PROBE_OK') { unlocked = true; accessPassword = pwd; pomSaveUnlock(); callback(); }
   else { window.alert('口令错误，无法解密该分类。'); }
 }
 
