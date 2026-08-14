@@ -589,7 +589,7 @@ function buildSearchIndex() {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var API_TOKEN = 'becf56d2932455e955eb5510d96bc29b91795b70538220d2878c21b9d2bb9753';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
+var API_TOKEN = '{{KB_API_TOKEN}}';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
 function fcReq(url, init) {  /* 自动注入 Bearer 令牌，修复公开站缺令牌导致 FC 401 的漂移 */
   init = init || {};
   init.headers = Object.assign({ 'Authorization': 'Bearer ' + API_TOKEN }, init.headers || {});
@@ -1180,7 +1180,10 @@ function renderSidebar(filter) {
       for (var sj = 0; sj < subfolders.length; sj++) {
         var sub = subfolders[sj];
         var isSubOpen = openSubs.has(sub.name) || filterLower;
-        html += '<div class="sub-group"><div class="sub-header' + (isSubOpen ? ' open' : '') + '" onclick="toggleSub(this)"><span class="sub-icon">📂</span><span>' + sub.name + '</span><span class="arrow">&#9654;</span></div><div class="sub-files' + (isSubOpen ? ' open' : '') + '">';
+        var isLT = (catKey === '01-基础知识' && sub.name === '附件');
+        var sfLabel = isLT ? '📚 学习工具' : sub.name;
+        var sfIcon = isLT ? '🧠' : '📂';
+        html += '<div class="sub-group"><div class="sub-header' + (isSubOpen ? ' open' : '') + '" onclick="toggleSub(this)"><span class="sub-icon">' + sfIcon + '</span><span>' + sfLabel + '</span><span class="arrow">&#9654;</span></div><div class="sub-files' + (isSubOpen ? ' open' : '') + '">';
         for (var sf2 = 0; sf2 < (sub.files || []).length; sf2++) {
           var sfFile = sub.files[sf2];
           var sfActive = currentFile && currentFile.category === sfFile.category && currentFile.filename === sfFile.filename && currentFile.subfolder === sfFile.subfolder;
@@ -1198,6 +1201,13 @@ function renderSidebar(filter) {
             html += '<div class="file-item group-file' + (gfActive ? ' active' : '') + '" onclick="openFile(\'' + gfFile.category + '\',\'' + gfFile.filename + '\',\'' + gfPath + '\')"><span class="dot"></span><span>' + gfFile.name + '</span><span class="ext-badge ' + gfFile.ext + '">' + gfFile.ext + '</span></div>';
           }
           html += '</div></div>';
+        }
+        /* 基础知识/附件 → 侧栏追加学习工具外部链接 */
+        if (isLT && typeof LEARNING_TOOLS !== 'undefined') {
+          for (var li = 0; li < LEARNING_TOOLS.length; li++) {
+            var lt = LEARNING_TOOLS[li];
+            html += '<div class="file-item sub-file" onclick="window.open(\'' + lt.url + '\',\'_blank\')"><span class="dot" style="background:#f59e0b"></span><span>' + lt.icon + ' ' + lt.name + '</span><span class="ext-badge link">↗</span></div>';
+          }
         }
         html += '</div></div>';
       }
