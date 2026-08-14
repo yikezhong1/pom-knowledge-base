@@ -7,6 +7,8 @@
 <script src="marked.min.js" defer></script>
 <script src="purify.min.js" defer></script>
 <script src="fuse.min.js" defer></script>
+<script src="crypto-js.min.js" defer></script>
+<script src="assets/china-geo.js" defer></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -28,11 +30,11 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--bg-primary); color: var(--text-primary);
-  height: 100vh; height: 100dvh; display: flex; overflow: hidden;
+  height: 100vh; display: flex; overflow: hidden;
 }
 .sidebar {
   width: 300px; min-width: 300px; background: var(--bg-sidebar);
-  display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
 }
 .sidebar-header {
   padding: 20px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.08);
@@ -362,8 +364,6 @@ body {
 .menu-btn:hover { background: var(--bg-sidebar-hover); }
 .sidebar-mask { display: none; }
 @media (max-width: 768px) {
-  body { height: 100vh; height: 100dvh; }
-  .sidebar { height: 100vh; height: 100dvh; }
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
     width: 280px; min-width: 280px;
@@ -374,35 +374,9 @@ body {
   .sidebar-mask { display: none; position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.45); }
   .sidebar-mask.show { display: block; }
   .menu-btn { display: inline-flex; }
-  .topbar { min-height: 48px; padding: 8px 12px; }
-  .breadcrumb { font-size: 13px; }
-  .content-wrap { padding: 14px 14px 110px; }
+  .content-wrap { padding: 16px; }
   .welcome .categories-grid { grid-template-columns: repeat(2, 1fr); }
   .form-row { grid-template-columns: 1fr; }
-  .category-page { max-width: 100%; }
-  .category-page .cp-header { flex-wrap: wrap; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; }
-  .category-page .cp-icon { font-size: 28px; }
-  .category-page .cp-title { font-size: 18px; }
-  .cp-action-btn { width: 100%; margin-right: 0; justify-content: center; margin-bottom: 10px; }
-  .customer-table-wrap { -webkit-overflow-scrolling: touch; }
-  .customer-table { min-width: 560px; font-size: 12px; }
-  .customer-table th, .customer-table td { padding: 8px 10px; }
-}
-@media (max-width: 480px) {
-  .content-wrap { padding: 12px 12px 100px; }
-  .customer-table,
-  .customer-table thead,
-  .customer-table tbody,
-  .customer-table th,
-  .customer-table td,
-  .customer-table tr { display: block; }
-  .customer-table thead { position: absolute; top: -9999px; left: -9999px; }
-  .customer-table tr { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); overflow: hidden; }
-  .customer-table td { border: none; border-bottom: 1px solid var(--border); position: relative; padding: 10px 12px 10px 42%; white-space: normal; }
-  .customer-table td:before { position: absolute; top: 10px; left: 12px; width: 38%; font-weight: 600; color: var(--accent); font-size: 12px; content: attr(data-label); }
-  .customer-table td:last-child { border-bottom: 0; padding-left: 12px; }
-  .customer-table .ct-idx { text-align: left; }
-  .customer-table-wrap { border: none; background: transparent; overflow-x: visible; }
 }
 /* ===== 统计面板 ===== */
 .stats-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary); z-index: 300; display: none; overflow-y: auto; }
@@ -589,7 +563,7 @@ function buildSearchIndex() {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var API_TOKEN = '{{KB_API_TOKEN}}';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
+var API_TOKEN = 'becf56d2932455e955eb5510d96bc29b91795b70538220d2878c21b9d2bb9753';  /* P0-2：FC 调用令牌，须与阿里云 FC 环境变量 API_TOKEN 一致 */
 function fcReq(url, init) {  /* 自动注入 Bearer 令牌，修复公开站缺令牌导致 FC 401 的漂移 */
   init = init || {};
   init.headers = Object.assign({ 'Authorization': 'Bearer ' + API_TOKEN }, init.headers || {});
@@ -601,78 +575,15 @@ var PROTECTED_CATS = ['04-客户档案', '05-行情与行业', '06-生产工艺'
 var unlocked = false;           // P0-3 整改：敏感分类默认锁定，需用户输入访问口令解锁
 var accessPassword = '';        // P0-3 整改：访问口令不内置源码，由用户输入（与 build-static.js MASTER 一致）
 
-/* 会话级解锁记忆：首次输对口令后写入 sessionStorage，刷新/切分类/新标签均免重输；
-   关闭浏览器（会话结束）后清空，下次打开浏览器需重新输入一次。 */
-var POM_UNLOCK_KEY = 'pom_kb_unlock_v1';
-function pomSaveUnlock() {
-  try { sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, p: accessPassword })); } catch (e) {}
-}
-function pomRestoreUnlock() {
-  try {
-    var s = sessionStorage.getItem(POM_UNLOCK_KEY);
-    if (!s) return;
-    var o = JSON.parse(s);
-    if (o && o.u) { unlocked = true; accessPassword = o.p || ''; }
-  } catch (e) {}
-}
-pomRestoreUnlock();
-
-/* 按需懒加载脚本（P1 首屏瘦身：地图数据 / 截图库用到时才下载） */
-function loadScript(src) {
-  return new Promise(function(resolve, reject) {
-    if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
-    var s = document.createElement('script');
-    s.src = src; s.onload = function() { resolve(); };
-    s.onerror = function() { reject(new Error('加载失败: ' + src)); };
-    document.head.appendChild(s);
-  });
-}
-function pomAddChinaBase(map) {
-  map.createPane('chinaBase');
-  map.getPane('chinaBase').style.zIndex = 100;
-  L.geoJSON(window.CHINA_GEO, {
-    pane: 'chinaBase',
-    style: { color: '#cbd5e1', weight: 0.8, fillColor: '#f8fafc', fillOpacity: 0.85 }
-  }).addTo(map);
-}
-
-/* P0 性能修复：用浏览器原生 Web Crypto（PBKDF2-HMAC-SHA256 + AES-CBC）异步解密，
-   不阻塞主线程；统一固定 salt 后只需派生 1 次密钥并缓存复用（与 build-static.js 一致）。
-   实测：纯 JS 60万轮 PBKDF2 ≈10秒/次 → 原生 ≈0.16秒/次，且异步不冻结界面。 */
-var POM_ENC_SALT_HEX = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
-var pomDerivedKey = null;   // 派生密钥缓存，解锁后所有文件复用，杜绝每文件重算
-
-function hexToBytes(hex) {
-  var a = [];
-  for (var i = 0; i < hex.length; i += 2) a.push(parseInt(hex.substr(i, 2), 16));
-  return new Uint8Array(a);
-}
-function b64ToBytes(b64) {
-  var bin = atob(b64);
-  var bytes = new Uint8Array(bin.length);
-  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-async function deriveKey(password) {
-  if (pomDerivedKey) return pomDerivedKey;
-  var baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
-  pomDerivedKey = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: hexToBytes(POM_ENC_SALT_HEX), iterations: 600000, hash: 'SHA-256' },
-    baseKey,
-    { name: 'AES-CBC', length: 256 },
-    false,
-    ['decrypt']
-  );
-  return pomDerivedKey;
-}
-async function decryptText(payload, password) {
+/* 解密构建端加密的内容（与 build-static.js 使用相同 CryptoJS 参数） */
+function decryptText(payload, password) {
   if (typeof payload !== 'string' || payload.indexOf('ENC:') !== 0) return payload;
   var p = payload.split(':');
-  var iv = hexToBytes(p[2]);
-  var ct = b64ToBytes(p[3]);
-  var key = await deriveKey(password);
-  var plainBuf = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, key, ct);
-  return new TextDecoder().decode(plainBuf);
+  var salt = CryptoJS.enc.Hex.parse(p[1]);
+  var iv = CryptoJS.enc.Hex.parse(p[2]);
+  var key = CryptoJS.PBKDF2(password, salt, { keySize: 256 / 32, iterations: 600000, hasher: CryptoJS.algo.SHA256 });
+  var d = CryptoJS.AES.decrypt(p[3], key, { iv: iv });
+  return d.toString(CryptoJS.enc.Utf8);
 }
 
 function isProtected(catKey) {
@@ -682,21 +593,20 @@ function isProtected(catKey) {
   return false;
 }
 
-async function requireUnlock(catKey, callback) {
+function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
   if (unlocked) { callback(); return; }
   var pwd = window.prompt('该分类为加密内容，请输入访问口令：');
   if (pwd === null) return;            // 用户取消
   var probe = (kbData && kbData.probe) ? kbData.probe : '';
-  if (!probe) { unlocked = true; accessPassword = pwd; pomSaveUnlock(); callback(); return; }
-  var t = '';
-  try { t = await decryptText(probe, pwd); }
-  catch (e) { t = ''; }
-  if (t === 'POM_PROBE_OK') { unlocked = true; accessPassword = pwd; pomSaveUnlock(); callback(); }
-  else { pomDerivedKey = null; window.alert('口令错误，无法解密该分类。'); }
+  if (!probe) { unlocked = true; accessPassword = pwd; callback(); return; }
+  var t;
+  try { t = decryptText(probe, pwd); } catch (e) { t = ''; }
+  if (t === 'POM_PROBE_OK') { unlocked = true; accessPassword = pwd; callback(); }
+  else { window.alert('口令错误，无法解密该分类。'); }
 }
 
-/* ===== 学习工具（已合并至「基础知识」分类页底部） ===== */
+/* ===== 学习工具（已合并至「产品知识」分类页底部） ===== */
 var LEARNING_TOOLS = [
   { name: '知识闯关（400题）', url: 'https://yikezhong1.github.io/pom-training/quiz.html', icon: '🧠', desc: '400 道精选题目，测试你的 POM 知识水平' },
   { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' }
@@ -1180,10 +1090,7 @@ function renderSidebar(filter) {
       for (var sj = 0; sj < subfolders.length; sj++) {
         var sub = subfolders[sj];
         var isSubOpen = openSubs.has(sub.name) || filterLower;
-        var isLT = (catKey === '01-基础知识' && sub.name === '附件');
-        var sfLabel = isLT ? '📚 学习工具' : sub.name;
-        var sfIcon = isLT ? '🧠' : '📂';
-        html += '<div class="sub-group"><div class="sub-header' + (isSubOpen ? ' open' : '') + '" onclick="toggleSub(this)"><span class="sub-icon">' + sfIcon + '</span><span>' + sfLabel + '</span><span class="arrow">&#9654;</span></div><div class="sub-files' + (isSubOpen ? ' open' : '') + '">';
+        html += '<div class="sub-group"><div class="sub-header' + (isSubOpen ? ' open' : '') + '" onclick="toggleSub(this)"><span class="sub-icon">📂</span><span>' + sub.name + '</span><span class="arrow">&#9654;</span></div><div class="sub-files' + (isSubOpen ? ' open' : '') + '">';
         for (var sf2 = 0; sf2 < (sub.files || []).length; sf2++) {
           var sfFile = sub.files[sf2];
           var sfActive = currentFile && currentFile.category === sfFile.category && currentFile.filename === sfFile.filename && currentFile.subfolder === sfFile.subfolder;
@@ -1201,13 +1108,6 @@ function renderSidebar(filter) {
             html += '<div class="file-item group-file' + (gfActive ? ' active' : '') + '" onclick="openFile(\'' + gfFile.category + '\',\'' + gfFile.filename + '\',\'' + gfPath + '\')"><span class="dot"></span><span>' + gfFile.name + '</span><span class="ext-badge ' + gfFile.ext + '">' + gfFile.ext + '</span></div>';
           }
           html += '</div></div>';
-        }
-        /* 基础知识/附件 → 侧栏追加学习工具外部链接 */
-        if (isLT && typeof LEARNING_TOOLS !== 'undefined') {
-          for (var li = 0; li < LEARNING_TOOLS.length; li++) {
-            var lt = LEARNING_TOOLS[li];
-            html += '<div class="file-item sub-file" onclick="window.open(\'' + lt.url + '\',\'_blank\')"><span class="dot" style="background:#f59e0b"></span><span>' + lt.icon + ' ' + lt.name + '</span><span class="ext-badge link">↗</span></div>';
-          }
         }
         html += '</div></div>';
       }
@@ -1309,7 +1209,7 @@ async function openFile(category, filename, subfolder) {
   var file = findFileInCat(catMeta, filename, subfolder);
   if (!file) return;
   if (file.encrypted && !unlocked) {
-    requireUnlock(category, function() { openFile(category, filename, subfolder); });
+    requireUnlock(category, function() { renderFile(category, filename, subfolder); });
     return;
   }
   var breadPath = catMeta.icon + ' ' + catMeta.label;
@@ -1329,7 +1229,7 @@ async function openFile(category, filename, subfolder) {
   var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
   var htmlToRender = file.html;
   if (file.encrypted) {
-    try { htmlToRender = await decryptText(file.html, accessPassword); }
+    try { htmlToRender = decryptText(file.html, accessPassword); }
     catch (e) { htmlToRender = '<p style="color:#ef4444">内容解密失败，请刷新页面重试。</p>'; }
   }
   content.innerHTML = '<div class="file-meta"><span class="meta-tag">' + catMeta.label + subLabel + '</span><span>' + filename + '</span><span>' + sizeKB + ' KB</span><span>更新于 ' + modDate + '</span></div>' + safeHtml(htmlToRender.indexOf('md-content') >= 0 ? htmlToRender : '<div class="md-content">' + htmlToRender + '</div>');
@@ -1788,13 +1688,13 @@ function showCustomerTable() {
          含 data-search 属性值，防止存储型 XSS 与属性注入 */
       var searchAttr = escapeHtml(((rec.customerName || '') + (rec.businessManager || '') + (rec.agent || '')).toLowerCase());
       html += '<tr data-idx="' + i + '" data-search="' + searchAttr + '" onclick="showCustomerDetail(' + i + ')">'
-            + '<td class="ct-idx" data-label="序号">' + (i + 1) + '</td>'
-            + '<td data-label="业务经理">' + escapeHtml(rec.businessManager || '') + '</td>'
-            + '<td class="ct-name" data-label="拜访客户名称">' + escapeHtml(rec.customerName || '') + '</td>'
-            + '<td data-label="成交状态">' + escapeHtml(rec.dealStatus || '') + '</td>'
-            + '<td data-label="客户性质">' + escapeHtml(rec.customerType || '') + '</td>'
-            + '<td data-label="所属代理商">' + escapeHtml(rec.agent || '') + '</td>'
-            + '<td data-label="操作"><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button>'
+            + '<td class="ct-idx">' + (i + 1) + '</td>'
+            + '<td>' + escapeHtml(rec.businessManager || '') + '</td>'
+            + '<td class="ct-name">' + escapeHtml(rec.customerName || '') + '</td>'
+            + '<td>' + escapeHtml(rec.dealStatus || '') + '</td>'
+            + '<td>' + escapeHtml(rec.customerType || '') + '</td>'
+            + '<td>' + escapeHtml(rec.agent || '') + '</td>'
+            + '<td><button class="ct-edit-btn" onclick="editCustomer(' + i + ',event)">编辑</button>'
             + '<button class="ct-del-btn" onclick="confirmDeleteCustomer(' + i + ',event)">删除</button></td></tr>';
     }
     html += '</tbody></table></div>';
@@ -1909,9 +1809,12 @@ function showCustomerMap(fromMap) {
     /* 离线底图：中国省级轮廓（放自定义 pane chinaBase zIndex=100，瓦片 tilePane=200、vector overlayPane=400，
        这样联网时高德瓦片盖在底图之上显示清晰街道；离线时瓦片空白才露出底图做兜底） */
     if (window.CHINA_GEO) {
-      pomAddChinaBase(customerMap);
-    } else {
-      loadScript('assets/china-geo.js').then(function() { if (window.CHINA_GEO) pomAddChinaBase(customerMap); }).catch(function() {});
+      customerMap.createPane('chinaBase');
+      customerMap.getPane('chinaBase').style.zIndex = 100;
+      L.geoJSON(window.CHINA_GEO, {
+        pane: 'chinaBase',
+        style: { color: '#cbd5e1', weight: 0.8, fillColor: '#f8fafc', fillOpacity: 0.85 }
+      }).addTo(customerMap);
     }
     /* 在线瓦片：高德街道图（联网显示，离线空白自动露出下方中国轮廓） */
     L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
@@ -2472,7 +2375,7 @@ async function showCategoryPage(catKey) {
         html += '<div class="customer-table-wrap"><table class="customer-table"><thead><tr><th>序号(' + custRecords.length + ')</th><th>业务经理</th><th>拜访客户名称</th><th>客户成交状态</th><th>客户性质</th><th>所属代理商</th><th>操作</th></tr></thead><tbody>';
         for (var ci = 0; ci < custRecords.length; ci++) {
           var crec = custRecords[ci];
-          html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx" data-label="序号">' + (ci + 1) + '</td><td data-label="业务经理">' + (crec.businessManager || '') + '</td><td class="ct-name" data-label="拜访客户名称">' + (crec.customerName || '') + '</td><td data-label="成交状态">' + (crec.dealStatus || '') + '</td><td data-label="客户性质">' + (crec.customerType || '') + '</td><td data-label="所属代理商">' + (crec.agent || '') + '</td><td data-label="操作"><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
+          html += '<tr onclick="showCustomerDetail(' + ci + ')"><td class="ct-idx">' + (ci + 1) + '</td><td>' + (crec.businessManager || '') + '</td><td class="ct-name">' + (crec.customerName || '') + '</td><td>' + (crec.dealStatus || '') + '</td><td>' + (crec.customerType || '') + '</td><td>' + (crec.agent || '') + '</td><td><button class="ct-edit-btn" onclick="editCustomer(' + ci + ',event)">编辑</button><button class="ct-del-btn" onclick="confirmDeleteCustomer(' + ci + ',event)">删除</button></td></tr>';
         }
         html += '</tbody></table></div>';
       }
@@ -2503,8 +2406,8 @@ async function showCategoryPage(catKey) {
       });
     });
 }
-  /* 基础知识分类：文件列表底部追加「学习工具」区块（合并原独立模块） */
-  if (catKey === '01-基础知识' && typeof LEARNING_TOOLS !== 'undefined' && LEARNING_TOOLS.length > 0) {
+  /* 产品知识分类：文件列表底部追加「学习工具」区块（合并原独立模块） */
+  if (catKey === '02-产品知识' && typeof LEARNING_TOOLS !== 'undefined' && LEARNING_TOOLS.length > 0) {
     html += '<div class="cp-sub-title">📚 学习工具</div><div class="cp-file-grid">';
     for (var ti = 0; ti < LEARNING_TOOLS.length; ti++) {
       var t = LEARNING_TOOLS[ti];
@@ -2795,7 +2698,8 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function() {});
 }
 </script>
-<!-- 网页截图依赖 html2canvas：改为点击截图按钮时按需懒加载，避免首屏下载 198KB -->
+<!-- 网页截图依赖：必须在下方截图脚本之前加载，否则页面刚打开时点击会抛 html2canvas is not defined -->
+<script src="html2canvas.min.js"></script>
 <script>
 (function(){
   var b=document.createElement('button');
@@ -2804,7 +2708,7 @@ if ('serviceWorker' in navigator) {
   b.onmouseenter=function(){b.style.transform='scale(1.12)'};
   b.onmouseleave=function(){b.style.transform='scale(1)'};
   document.body.appendChild(b);
-  b.addEventListener('click',async function(){
+  b.addEventListener('click',function(){
     if(b.dataset.busy==='1')return;
     b.dataset.busy='1';b.style.opacity='.4';
     var o=b.innerHTML;b.innerHTML='⏳';b.style.display='none';
@@ -2813,10 +2717,6 @@ if ('serviceWorker' in navigator) {
     targets.forEach(function(el){el.style.overflow='visible';el.style.height='auto';el.style.maxHeight='none'});
     var cw=document.querySelector('.content-wrap');if(cw)cw.scrollTop=0;
     window.scrollTo(0,0);
-    if (typeof html2canvas === 'undefined') {
-      try { await loadScript('html2canvas.min.js'); }
-      catch (e) { alert('截图组件加载失败'); b.style.display='';b.innerHTML=o;b.style.opacity='';b.dataset.busy='0'; return; }
-    }
     var fix=document.createElement('style');fix.id='pom-shot-fix';fix.textContent='*{-webkit-background-clip:border-box!important;-webkit-text-fill-color:initial!important}';document.head.appendChild(fix);
     setTimeout(function(){
       html2canvas(document.body,{useCORS:true,scrollX:0,scrollY:0,
