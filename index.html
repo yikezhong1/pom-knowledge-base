@@ -685,6 +685,16 @@ function isProtected(catKey) {
 async function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
   if (unlocked) { callback(); return; }
+  // 本地免密：仅当本地 server 注入了 __KB_LOCAL_MASTER__（localhost 访问时）才走此分支；
+  // 线上公网域名不注入该变量，自动跳过，仍弹窗输口令。主密钥不落公开前端文件。
+  if (window.__KB_LOCAL_MASTER__) {
+    var lprobe = (kbData && kbData.probe) ? kbData.probe : '';
+    if (!lprobe) { unlocked = true; accessPassword = window.__KB_LOCAL_MASTER__; pomSaveUnlock(); callback(); return; }
+    try {
+      var lt = await decryptText(lprobe, window.__KB_LOCAL_MASTER__);
+      if (lt === 'POM_PROBE_OK') { unlocked = true; accessPassword = window.__KB_LOCAL_MASTER__; pomSaveUnlock(); callback(); return; }
+    } catch (e) { /* 注入密钥无效则退回弹窗 */ }
+  }
   var pwd = window.prompt('该分类为加密内容，请输入访问口令：');
   if (pwd === null) return;            // 用户取消
   var probe = (kbData && kbData.probe) ? kbData.probe : '';
