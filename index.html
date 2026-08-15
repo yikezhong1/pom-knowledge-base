@@ -589,7 +589,7 @@ function buildSearchIndex() {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var API_TOKEN = '{{KB_API_TOKEN}}';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
+var API_TOKEN = 'becf56d2932455e955eb5510d96bc29b91795b70538220d2878c21b9d2bb9753';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
 function fcReq(url, init) {  /* 自动注入 Bearer 令牌，修复公开站缺令牌导致 FC 401 的漂移 */
   init = init || {};
   init.headers = Object.assign({ 'Authorization': 'Bearer ' + API_TOKEN }, init.headers || {});
@@ -685,6 +685,16 @@ function isProtected(catKey) {
 async function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
   if (unlocked) { callback(); return; }
+  // 本地免密：仅当本地 server 注入了 __KB_LOCAL_MASTER__（localhost 访问时）才走此分支；
+  // 线上公网域名不注入该变量，自动跳过，仍弹窗输口令。主密钥不落公开前端文件。
+  if (window.__KB_LOCAL_MASTER__) {
+    var lprobe = (kbData && kbData.probe) ? kbData.probe : '';
+    if (!lprobe) { unlocked = true; accessPassword = window.__KB_LOCAL_MASTER__; pomSaveUnlock(); callback(); return; }
+    try {
+      var lt = await decryptText(lprobe, window.__KB_LOCAL_MASTER__);
+      if (lt === 'POM_PROBE_OK') { unlocked = true; accessPassword = window.__KB_LOCAL_MASTER__; pomSaveUnlock(); callback(); return; }
+    } catch (e) { /* 注入密钥无效则退回弹窗 */ }
+  }
   var pwd = window.prompt('该分类为加密内容，请输入访问口令：');
   if (pwd === null) return;            // 用户取消
   var probe = (kbData && kbData.probe) ? kbData.probe : '';
@@ -1184,7 +1194,8 @@ function renderSidebar(filter) {
         var sfLabel = isLT ? '📚 学习工具' : sub.name;
         var sfIcon = isLT ? '🧠' : '📂';
         html += '<div class="sub-group"><div class="sub-header' + (isSubOpen ? ' open' : '') + '" onclick="toggleSub(this)"><span class="sub-icon">' + sfIcon + '</span><span>' + sfLabel + '</span><span class="arrow">&#9654;</span></div><div class="sub-files' + (isSubOpen ? ' open' : '') + '">';
-        for (var sf2 = 0; sf2 < (sub.files || []).length; sf2++) {
+        /* 学习工具(附件目录)只展示外部链接，原始附件文件不进侧栏（仅供正文引用，如注塑视频 mp4） */
+        for (var sf2 = 0; !isLT && sf2 < (sub.files || []).length; sf2++) {
           var sfFile = sub.files[sf2];
           var sfActive = currentFile && currentFile.category === sfFile.category && currentFile.filename === sfFile.filename && currentFile.subfolder === sfFile.subfolder;
           var sfPath = encodeURIComponent(sub.name);
@@ -1317,6 +1328,12 @@ async function openFile(category, filename, subfolder) {
   breadPath += ' / <span>' + file.name + '</span>';
   document.getElementById('breadcrumb').innerHTML = breadPath;
   var actions = document.getElementById('topbarActions');
+  if (file.ext === 'mp4' || file.ext === 'webm' || file.ext === 'ogg') {
+    var vidUrl = './' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
+    actions.innerHTML = '<a class="pdf-dl-btn" href="' + vidUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:6px 14px;border-radius:8px;background:var(--accent,#2563eb);color:#fff;text-decoration:none;font-size:13px;font-weight:600;">新窗口打开视频</a>';
+    content.innerHTML = '<div style="padding:10px 0"><video controls preload="metadata" src="' + vidUrl + '" style="max-width:100%;border-radius:12px;background:#0b1220;display:block;margin:0 auto"></video></div>';
+    return;
+  }
   if (file.ext === 'pdf') {
     var pdfUrl = './' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
     actions.innerHTML = '<a class="pdf-dl-btn" href="' + pdfUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:6px 14px;border-radius:8px;background:var(--accent,#2563eb);color:#fff;text-decoration:none;font-size:13px;font-weight:600;">打开 / 下载 PDF</a>';
