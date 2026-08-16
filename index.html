@@ -589,7 +589,7 @@ function buildSearchIndex() {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var API_TOKEN = '{{KB_API_TOKEN}}';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
+var API_TOKEN = 'becf56d2932455e955eb5510d96bc29b91795b70538220d2878c21b9d2bb9753';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
 function fcReq(url, init) {  /* 自动注入 Bearer 令牌，修复公开站缺令牌导致 FC 401 的漂移 */
   init = init || {};
   init.headers = Object.assign({ 'Authorization': 'Bearer ' + API_TOKEN }, init.headers || {});
