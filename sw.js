@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pom-kb-202608162248';
+var CACHE_NAME = 'pom-kb-202608162306';
 /* 预缓存骨架：导航页 + JS 库。数据文件(data-index.json / cat-*.json)走运行时懒加载缓存 */
 var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'fuse.min.js', 'lib/leaflet/leaflet.min.css', 'lib/leaflet/leaflet.min.js'];
 
@@ -31,6 +31,21 @@ function staleWhileRevalidate(request) {
   });
 }
 
+/* 数据文件(目录索引/分类json)：联网优先，断网才回退缓存。
+   绝不能 staleWhileRevalidate —— 否则会先把"部署前的旧数据"喂给页面，
+   造成"首屏能看到新内容、刷新后旧内容"的诡异现象。 */
+function networkFirst(request) {
+  return fetch(request).then(function(response) {
+    if (response && response.status === 200) {
+      var clone = response.clone();
+      caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+    }
+    return response;
+  }).catch(function() {
+    return caches.match(request);
+  });
+}
+
 self.addEventListener('fetch', function(event) {
   var url = event.request.url;
   /* 只缓存同源 GET 请求 */
@@ -40,9 +55,9 @@ self.addEventListener('fetch', function(event) {
 
   var isDataIndex = url.indexOf('data-index.json') >= 0;
   var isCat = /\/cat-[^/]+\.json(\?|$)/.test(url);
-  /* 懒加载数据文件(data-index / cat-*)：先给旧缓存、后台更新 → 复访秒开 */
+  /* 懒加载数据文件(data-index / cat-*)：联网优先，断网回退缓存 → 永远拿到最新数据 */
   if (isDataIndex || isCat) {
-    event.respondWith(staleWhileRevalidate(event.request));
+    event.respondWith(networkFirst(event.request));
     return;
   }
 
