@@ -6,8 +6,7 @@
 <title>POM 聚甲醛知识库</title>
 <script src="marked.min.js" defer></script>
 <script src="purify.min.js" defer></script>
-  <script src="fuse.min.js" defer></script>
-  <script src="lib/xlsx.full.min.js" defer></script>
+<script src="fuse.min.js" defer></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -710,8 +709,7 @@ async function requireUnlock(catKey, callback) {
 /* ===== 学习工具（已合并至「基础知识」分类页底部） ===== */
 var LEARNING_TOOLS = [
   { name: '知识闯关（400题）', url: 'https://yikezhong1.github.io/pom-training/quiz.html', icon: '🧠', desc: '400 道精选题目，测试你的 POM 知识水平' },
-  { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' },
-  { name: '7月份应用知识专项测试（60题）', url: 'https://yikezhong1.github.io/pom-training/quiz-202607.html', icon: '🧪', desc: '依据《7月份POM基础应用知识测试材料》出题：缩水凹陷调机、保压补缩、料温模温、冷却排气、国产料热稳定红线，含 12 道现场情景题' }
+  { name: '交互动画（13场景）', url: 'https://yikezhong1.github.io/pom-training/animation.html', icon: '🎬', desc: '13 个生产场景动画，直观理解工艺流程' }
 ];
 
 /* ===== 在线填报表单定义 ===== */
@@ -1148,8 +1146,6 @@ function renderSidebar(filter) {
     if (catKey.indexOf('04-客户档案') === 0 && !locked) {
       var custCount = (cat._customerRecords || []).length;
       html += '<div class="file-item" onclick="showCustomerTable()"><span class="dot" style="background:#10b981"></span><span>📋 现有客户档案</span><span class="ext-badge form">' + custCount + '</span></div>';
-      /* 客户分布区域图：独立外部页（与知识库主内容隔离，不参与索引/加密） */
-      html += '<div class="file-item" onclick="window.open(\'https://yikezhong1.github.io/pom-knowledge-base/customer-map/\',\'_blank\')"><span class="dot" style="background:#f59e0b"></span><span>🗺 客户分布区域图</span><span class="ext-badge link">↗</span></div>';
     }
     if (catKey === '05-行情与行业') {
   for (var sj = 0; sj < subfolders.length; sj++) {
@@ -1795,7 +1791,6 @@ function showCustomerTable() {
   document.getElementById('topbarActions').innerHTML = '';
   var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📋</div><div><div class="cp-title">现有客户档案</div><div class="cp-count">共 ' + records.length + ' 位客户（点击行查看详情）</div></div></div>';
   html += '<button class="cp-action-btn" onclick="showCustomerForm()">📝 在线填报新客户档案</button>';
-  html += '<button class="cp-action-btn" onclick="exportCustomersXLSX()">⬇ 导出客户档案(xlsx)</button>';
   if (records.length > 0) {
     html += '<button class="cp-action-btn" onclick="showCustomerMap()">🗺️ 客户分布区域图</button>';
     html += '<div style="margin-bottom:14px"><input type="text" id="custSearchInput" placeholder="🔍 搜索客户名称 / 业务经理 / 代理商..." oninput="filterCustomerTable(this.value)" style="width:100%;max-width:400px;padding:9px 14px;border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none;transition:border .2s"></div>';
@@ -1824,65 +1819,6 @@ function showCustomerTable() {
   html += '</div>';
   document.getElementById('contentWrap').innerHTML = html;
   document.getElementById('contentWrap').scrollTop = 0;
-}
-
-function exportCustomersXLSX() {
-  if (typeof XLSX === 'undefined') { showToast('导出组件未加载，请刷新页面后重试'); return; }
-  var cat = (kbData && kbData.categories) ? kbData.categories['04-客户档案'] : null;
-  var records = (cat && cat._customerRecords) ? cat._customerRecords : [];
-  if (!records.length) { showToast('暂无客户档案可导出'); return; }
-  /* 35 个字段全导出（与 customers.json 结构一致），中文列名、按业务顺序 */
-  var fields = [
-    ['业务经理', 'businessManager'],
-    ['拜访客户名称', 'customerName'],
-    ['客户成交状态', 'dealStatus'],
-    ['客户性质', 'customerType'],
-    ['所属代理商', 'agent'],
-    ['市场区域', 'marketRegion'],
-    ['省/市/区县/乡镇', 'address'],
-    ['经纬度', 'coordinates'],
-    ['联系人', 'contact'],
-    ['联系电话', 'phone'],
-    ['联系人职务', 'contactTitle'],
-    ['注册资本', 'registeredCapital'],
-    ['成立时间', 'foundedDate'],
-    ['客户所属行业', 'industry'],
-    ['公司产品线情况', 'productLine'],
-    ['公司目前人数', 'employeeCount'],
-    ['聚甲醛月度用量', 'pomMonthlyUsage'],
-    ['使用过的其他厂家', 'otherBrandsUsed'],
-    ['其他厂聚甲醛用量', 'otherBrandUsage'],
-    ['其他塑料月用量', 'otherPlasticUsage'],
-    ['目前在用厂家及牌号', 'currentBrand'],
-    ['客户选用理由', 'selectionReason'],
-    ['采购上游供应商', 'upstreamSupplier'],
-    ['付款方式', 'paymentMethod'],
-    ['产品主要供应客户', 'supplyTarget'],
-    ['主要应用领域', 'applicationField'],
-    ['应用领域普遍需求', 'fieldDemand'],
-    ['应用领域对POM指标需求', 'pomSpecDemand'],
-    ['客户核心痛点', 'corePainPoint'],
-    ['市场容量', 'marketCapacity'],
-    ['上游投放量分布', 'upstreamDistribution'],
-    ['下游需求量区域分布', 'downstreamDistribution'],
-    ['其他信息', 'otherInfo'],
-    ['录入时间', 'entryTime'],
-    ['最后编辑时间', 'lastEditTime']
-  ];
-  var headers = fields.map(function(f) { return f[0]; });
-  var rows = records.map(function(rec) {
-    var o = {};
-    fields.forEach(function(f) { o[f[0]] = (rec[f[1]] != null) ? rec[f[1]] : ''; });
-    return o;
-  });
-  var ws = XLSX.utils.json_to_sheet(rows, { header: headers });
-  var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '客户档案');
-  var d = new Date();
-  var p2 = function(n) { return String(n).padStart(2, '0'); };
-  var fn = '客户档案_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes()) + '.xlsx';
-  XLSX.writeFile(wb, fn);
-  showToast('已导出 ' + records.length + ' 位客户到 ' + fn);
 }
 
 function filterCustomerTable(val) {
