@@ -2889,7 +2889,7 @@ if ('serviceWorker' in navigator) {
     if(b.dataset.busy==='1')return;
     b.dataset.busy='1';b.style.opacity='.4';
     var o=b.innerHTML;b.innerHTML='⏳';b.style.display='none';
-    var targets=[document.body,document.querySelector('.main'),document.querySelector('.content-wrap'),document.querySelector('.sidebar')].filter(Boolean);
+    var targets=[document.querySelector('.main'),document.querySelector('.content-wrap')].filter(Boolean);
     var saved=targets.map(function(el){return{el:el,ov:el.style.overflow,h:el.style.height,mh:el.style.maxHeight}});
     targets.forEach(function(el){el.style.overflow='visible';el.style.height='auto';el.style.maxHeight='none'});
     var cw=document.querySelector('.content-wrap');if(cw)cw.scrollTop=0;
@@ -2900,12 +2900,8 @@ if ('serviceWorker' in navigator) {
     }
     var fix=document.createElement('style');fix.id='pom-shot-fix';fix.textContent='*{-webkit-background-clip:border-box!important;-webkit-text-fill-color:initial!important}';document.head.appendChild(fix);
     setTimeout(function(){
-      html2canvas(document.body,{useCORS:true,scrollX:0,scrollY:0,
-        width:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth),
-        height:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),
-        windowWidth:document.documentElement.scrollWidth,
-        windowHeight:document.documentElement.scrollHeight,
-        backgroundColor:null
+      html2canvas(document.querySelector('.content-wrap'),{useCORS:true,scrollY:0,
+        backgroundColor:getComputedStyle(document.body).backgroundColor
       }).then(function(c){
         saved.forEach(function(s){s.el.style.overflow=s.ov;s.el.style.height=s.h;s.el.style.maxHeight=s.mh});
         document.head.removeChild(fix);
