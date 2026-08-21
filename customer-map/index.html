@@ -91,6 +91,14 @@
   .btn.cancel{background:transparent;border-color:var(--gray);color:var(--muted)}
   .foot{margin-top:16px;color:var(--muted);font-size:12px;line-height:1.7}
   .foot b{color:var(--text)}
+  /* 移动端响应式：地图在上、详情列表在下，给地图固定高度避免被挤没 */
+  @media (max-width:768px){
+    #mapBody{flex-direction:column;height:auto}
+    #mapLeft{height:52vh;min-height:300px}
+    #map{height:100%}
+    #mapRight{width:100%;border-left:none;border-top:1px solid var(--line)}
+    .mr-head,.mr-legend{padding-left:12px;padding-right:12px}
+  }
 </style>
 <!-- 地图：Leaflet + 高德 HTTPS 瓦片（零密钥、无代理，线上/手机均可用） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/lib/leaflet/leaflet.min.css">
@@ -338,7 +346,7 @@ function delRow(i){
   DATA.splice(i,1); saveData(); if(selectedIdx===i)selectedIdx=-1; refreshAll();
 }
 
-/* ---------- 地图（腾讯 GL JS，合规代理） ---------- */
+/* ---------- 地图（Leaflet + 高德 HTTPS 瓦片，零密钥无代理） ---------- */
 function pin(color){
   const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='24' height='36' viewBox='0 0 24 36'><path d='M12 0C5.4 0 0 5.4 0 12c0 8 12 24 12 24s12-16 12-24c0-6.6-5.4-12-12-12z' fill='${color}'/><circle cx='12' cy='12' r='5' fill='#fff'/></svg>`;
   return 'data:image/svg+xml,'+encodeURIComponent(svg);
@@ -364,6 +372,8 @@ function ensureMap(){
   markers=L.layerGroup().addTo(map);
   mapReady=true;
   renderMap(); renderMapRight();
+  // 兜底：容器从隐藏→显示后，leaflet 必须重算尺寸，否则瓦片空白
+  setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} },50);
 }
 function renderMap(){
   if(!mapReady||!markers) return;
