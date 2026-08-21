@@ -92,13 +92,9 @@
   .foot{margin-top:16px;color:var(--muted);font-size:12px;line-height:1.7}
   .foot b{color:var(--text)}
 </style>
-<!-- 腾讯地图合规代理模式（零前端密钥，由 WorkBuddy 运行时代理） -->
-<script type="text/javascript">
-  window._TMapSecurityConfig = {
-    serviceHost: 'http://127.0.0.1:__WB_HTTP_PORT__/_TMapService/_wbt/__WB_TMAP_SECRET__',
-  };
-</script>
-<script src="https://map.qq.com/api/gljs?v=1.exp"></script>
+<!-- 地图：Leaflet + 高德 HTTPS 瓦片（零密钥、无代理，线上/手机均可用） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/lib/leaflet/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/lib/leaflet/leaflet.min.js"></script>
 </head>
 <body>
 <h1>🎯 汕头 POM 注塑客户线索（共聚甲醛原料目标企业）</h1>
@@ -128,7 +124,7 @@
   <div id="mapBody">
     <div id="mapLeft">
       <div id="map"></div>
-      <div class="mapmsg" id="mapMsg">⚠️ 地图组件未能加载（可能无网络或预览环境不支持代理）。右侧列表与编辑功能不受影响。如需离线地图，可改用高德/天地图自有密钥版本。</div>
+      <div class="mapmsg" id="mapMsg">⚠️ 地图组件未能加载（可能无网络或 Leaflet 未能加载）。右侧列表与编辑功能不受影响。</div>
     </div>
     <div id="mapRight">
       <div class="mr-head">
@@ -362,29 +358,23 @@ function transformlng(x,y){let r=300.0+x+2.0*y+0.1*x*x+0.1*x*y+0.1*Math.sqrt(Mat
 
 function ensureMap(){
   if(mapReady) return;
-  if(typeof TMap==="undefined"){ document.getElementById("mapMsg").style.display="block"; return; }
-  map=new TMap.Map("map",{zoom:11, center:new TMap.LatLng(23.374,116.685)});
-  markers=new TMap.MultiMarker({
-    map:map,
-    styles:{
-      A:new TMap.MarkerStyle({width:24,height:36,anchor:{x:12,y:36},src:pin(COLOR.A)}),
-      B:new TMap.MarkerStyle({width:24,height:36,anchor:{x:12,y:36},src:pin(COLOR.B)}),
-      C:new TMap.MarkerStyle({width:24,height:36,anchor:{x:12,y:36},src:pin(COLOR.C)}),
-      S:new TMap.MarkerStyle({width:30,height:44,anchor:{x:15,y:44},src:pin('#f59e0b')})
-    },
-    geometries:[]
-  });
-  markers.on("click",(e)=>{ selectCustomer(+e.geometry.properties.idx); });
+  if(typeof L==="undefined"){ document.getElementById("mapMsg").style.display="block"; return; }
+  map=L.map("map",{zoom:11, center:[23.374,116.685]});
+  L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{subdomains:'1234',maxZoom:18,attribution:'高德地图'}).addTo(map);
+  markers=L.layerGroup().addTo(map);
   mapReady=true;
   renderMap(); renderMapRight();
 }
 function renderMap(){
   if(!mapReady||!markers) return;
+  markers.clearLayers();
   const v=getMapView();
-  markers.setGeometries(v.map(({d,i})=>{
+  v.forEach(({d,i})=>{
     const gcj=wgs2gcj(d.lng,d.lat);
-    return {id:"m"+i, styleId:(i===selectedIdx?"S":d.cat), position:new TMap.LatLng(gcj[1],gcj[0]), properties:{idx:i}};
-  }));
+    const m=L.marker([gcj[1],gcj[0]],{icon:L.icon({iconUrl:pin(i===selectedIdx?"#f59e0b":COLOR[d.cat]),iconSize:[24,36],iconAnchor:[12,36]})});
+    m.on("click",()=>selectCustomer(i));
+    markers.addLayer(m);
+  });
 }
 function renderMapRight(){
   const v=getMapView();
@@ -406,7 +396,7 @@ function selectCustomer(i){
   renderMapRight(); renderMap();
   if(mapReady){
     const d=DATA[i], gcj=wgs2gcj(d.lng,d.lat);
-    try{ map.panTo(new TMap.LatLng(gcj[1],gcj[0])); if(map.getZoom()<13) map.setZoom(14); }catch(e){}
+    try{ map.panTo([gcj[1],gcj[0]]); if(map.getZoom()<13) map.setZoom(14); }catch(e){}
   }
 }
 function renderDetail(){
@@ -482,7 +472,7 @@ document.getElementById("mapBtn").onclick=()=>{
   const p=document.getElementById("mapPanel");
   const show=!p.classList.contains("show");
   p.classList.toggle("show",show);
-  if(show){ document.getElementById("mapBtn").classList.add("on"); ensureMap(); setTimeout(()=>map&&map.resize&&map.resize(),200); }
+  if(show){ document.getElementById("mapBtn").classList.add("on"); ensureMap(); setTimeout(()=>map&&map.invalidateSize&&map.invalidateSize(),200); }
   else document.getElementById("mapBtn").classList.remove("on");
 };
 document.getElementById("exp").onclick=()=>{
