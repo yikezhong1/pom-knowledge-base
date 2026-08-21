@@ -100,9 +100,9 @@
     .mr-head,.mr-legend{padding-left:12px;padding-right:12px}
   }
 </style>
-<!-- 地图：Leaflet + 高德 HTTPS 瓦片（零密钥、无代理，线上/手机均可用） -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/lib/leaflet/leaflet.min.css">
-<script src="https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/lib/leaflet/leaflet.min.js"></script>
+<!-- 地图：Leaflet 走同域名 lib/（与主站客户地图一致，不依赖外部 CDN，手机网络不可达 jsDelivr 时也能加载） -->
+<link rel="stylesheet" href="../lib/leaflet/leaflet.min.css">
+<script src="../lib/leaflet/leaflet.min.js"></script>
 </head>
 <body>
 <h1>🎯 汕头 POM 注塑客户线索（共聚甲醛原料目标企业）</h1>
@@ -368,10 +368,12 @@ function ensureMap(){
   if(mapReady) return;
   if(typeof L==="undefined"){ document.getElementById("mapMsg").style.display="block"; return; }
   map=L.map("map",{zoom:11, center:[23.374,116.685]});
-  L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{subdomains:'1234',maxZoom:18,attribution:'高德地图'}).addTo(map);
+  // 瓦片用 webrd0{s}（与主站客户地图一致，手机验证可用）；加 errorTileUrl 离线兜底
+  L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{subdomains:'1234',maxZoom:18,errorTileUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',attribution:'高德地图'}).addTo(map);
   markers=L.layerGroup().addTo(map);
   mapReady=true;
   renderMap(); renderMapRight();
+  map.on('zoomend', renderMap); // 缩放时按像素距离重新聚类（重叠合并）
   // 兜底：容器从隐藏→显示后，leaflet 必须重算尺寸，否则瓦片空白
   setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} },50);
 }
@@ -379,11 +381,47 @@ function renderMap(){
   if(!mapReady||!markers) return;
   markers.clearLayers();
   const v=getMapView();
-  v.forEach(({d,i})=>{
+  if(!v.length) return;
+  // 像素距离聚类（重叠合并）：把屏幕上距离 ≤26px 的客户合成一个气泡，缩放时自动聚合/展开
+  const OVERLAP_PX=26;
+  const pts=v.map(({d,i})=>{
     const gcj=wgs2gcj(d.lng,d.lat);
-    const m=L.marker([gcj[1],gcj[0]],{icon:L.icon({iconUrl:pin(i===selectedIdx?"#f59e0b":COLOR[d.cat]),iconSize:[24,36],iconAnchor:[12,36]})});
-    m.on("click",()=>selectCustomer(i));
-    markers.addLayer(m);
+    let px={x:0,y:0};
+    try{ px=map.latLngToLayerPoint(L.latLng(gcj[1],gcj[0])); }catch(e){}
+    return {d,i,gcj,px};
+  });
+  const used=new Array(pts.length).fill(false);
+  const clusters=[];
+  for(let a=0;a<pts.length;a++){
+    if(used[a]) continue;
+    const group=[pts[a]]; used[a]=true;
+    for(let b=0;b<pts.length;b++){
+      if(used[b]) continue;
+      for(const g of group){
+        const dx=g.px.x-pts[b].px.x, dy=g.px.y-pts[b].px.y;
+        if(Math.sqrt(dx*dx+dy*dy)<=OVERLAP_PX){ group.push(pts[b]); used[b]=true; break; }
+      }
+    }
+    clusters.push(group);
+  }
+  clusters.forEach(group=>{
+    if(group.length===1){
+      const {d,i,gcj}=group[0];
+      const color=i===selectedIdx?"#f59e0b":COLOR[d.cat];
+      const m=L.marker([gcj[1],gcj[0]],{icon:L.icon({iconUrl:pin(color),iconSize:[24,36],iconAnchor:[12,36]})});
+      m.on("click",()=>selectCustomer(i));
+      markers.addLayer(m);
+    } else {
+      const cLat=group.reduce((s,p)=>s+p.gcj[1],0)/group.length;
+      const cLng=group.reduce((s,p)=>s+p.gcj[0],0)/group.length;
+      const badge=L.divIcon({className:'cm-cluster',html:'<div style="background:#6366f1;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid #fff">'+group.length+'</div>',iconSize:[36,36],iconAnchor:[18,18]});
+      const m=L.marker([cLat,cLng],{icon:badge});
+      let html='<div style="min-width:220px;max-width:320px;max-height:260px;overflow-y:auto"><div style="font-weight:600;font-size:13px;color:#6366f1;margin-bottom:8px">📍 此区域有 '+group.length+' 位客户</div>';
+      group.forEach(p=>{ html+='<div style="padding:6px 8px;margin-bottom:4px;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="selectCustomer('+p.i+')">'+esc(p.d.name)+'</div>'; });
+      html+='</div>';
+      m.bindPopup(html);
+      markers.addLayer(m);
+    }
   });
 }
 function renderMapRight(){
@@ -403,6 +441,7 @@ function renderMapRight(){
 }
 function selectCustomer(i){
   selectedIdx=i;
+  if(mapReady) map.closePopup(); // 关掉聚合气泡弹窗，避免遮挡
   renderMapRight(); renderMap();
   if(mapReady){
     const d=DATA[i], gcj=wgs2gcj(d.lng,d.lat);
