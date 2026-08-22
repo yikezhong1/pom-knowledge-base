@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汕头 POM 注塑客户线索 · 共聚甲醛原料目标企业</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#172033; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --primary:#2563eb; --primary2:#3b82f6;
+    --green:#22c55e; --amber:#f59e0b; --gray:#64748b; --red:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.5;padding:18px}
+  h1{font-size:20px;font-weight:700;margin-bottom:4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;flex:1;min-width:120px}
+  .stat b{display:block;font-size:22px;color:var(--primary2)}
+  .stat span{font-size:12px;color:var(--muted)}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+  .btn{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 13px;font-size:13px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--primary2)}
+  .btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.map{background:#0ea5e9;border-color:#0ea5e9;color:#04222e;font-weight:600}
+  .btn.export{background:var(--green);border-color:var(--green);color:#06240f;font-weight:600}
+  .btn.reset{background:transparent;border-color:var(--gray);color:var(--muted)}
+  input.search{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;flex:1;min-width:200px}
+  input.search::placeholder{color:var(--muted)}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:980px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;position:sticky;top:0;white-space:nowrap}
+  tr:hover td{background:var(--panel2)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+  .t-a{background:rgba(34,197,94,.15);color:#4ade80}
+  .t-b{background:rgba(37,99,235,.15);color:#60a5fa}
+  .t-c{background:rgba(148,163,184,.18);color:#cbd5e1}
+  .phone{font-family:ui-monospace,Menlo,monospace;color:#a5f3fc}
+  .nm{font-weight:600;color:#fff}
+  .addr{color:var(--muted);font-size:12px}
+  .coord{font-family:ui-monospace,Menlo,monospace;color:#fbbf24;font-size:12px}
+  .note{color:var(--amber);font-size:12px}
+  .op a{color:var(--primary2);cursor:pointer;margin-right:10px;font-size:12px;text-decoration:none}
+  .op a.del{color:#f87171}
+  .badge-hide{color:#fb7185}
+  .count{color:var(--muted);font-size:12px;margin-left:auto}
+  /* 地图面板：左图右详情 */
+  #mapPanel{display:none;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #mapPanel.show{display:block}
+  #mapBody{display:flex;height:66vh}
+  #mapLeft{flex:1;min-width:0;background:#0b1220}
+  #map{width:100%;height:100%}
+  #mapRight{width:390px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .mr-head{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .mr-head h3{font-size:15px;margin-bottom:8px}
+  .mr-search{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:13px}
+  .mr-legend{display:flex;gap:12px;font-size:12px;color:var(--muted);padding:8px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .mr-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle}
+  .mr-list{flex:1;overflow:auto;padding:6px}
+  .mr-item{padding:9px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:4px}
+  .mr-item:hover{background:var(--panel2)}
+  .mr-item.sel{background:var(--panel2);border-color:var(--primary)}
+  .mr-item .nm{font-weight:600;color:#fff;font-size:13px}
+  .mr-item .sub{color:var(--muted);font-size:11px;margin-top:2px}
+  .mr-detail,.mr-edit{flex:1;overflow:auto;padding:14px}
+  .mr-detail .ttl{font-size:16px;font-weight:700;margin-bottom:10px;color:#fff}
+  .dl{font-size:13px;margin-bottom:9px;line-height:1.6}
+  .dl b{color:var(--muted);font-weight:500;display:inline-block;width:52px;vertical-align:top}
+  .mr-acts{display:flex;gap:8px;margin-top:14px}
+  .mr-edit .field{margin-bottom:9px}
+  .mr-edit label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+  .mr-edit input,.mr-edit select,.mr-edit textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:7px 9px;font-size:13px}
+  .mr-edit textarea{resize:vertical;min-height:44px}
+  .back{color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:8px;display:inline-block}
+  .back:hover{color:var(--text)}
+  .mapmsg{display:none;padding:30px;text-align:center;color:var(--amber);font-size:14px}
+  /* 弹窗（表格内编辑用） */
+  #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:center;justify-content:center}
+  #modal.show{display:flex}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(560px,92vw);max-height:90vh;overflow:auto}
+  .card h3{font-size:16px;margin-bottom:14px}
+  .field{margin-bottom:11px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  .field input,.field select,.field textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px}
+  .field textarea{resize:vertical;min-height:46px}
+  .row2{display:flex;gap:10px}.row2 .field{flex:1}
+  .card .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .btn.sm{padding:6px 16px}
+  .btn.save{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+  .btn.cancel{background:transparent;border-color:var(--gray);color:var(--muted)}
+  .foot{margin-top:16px;color:var(--muted);font-size:12px;line-height:1.7}
+  .foot b{color:var(--text)}
+  /* 移动端响应式：地图在上、详情列表在下，给地图固定高度避免被挤没 */
+  @media (max-width:768px){
+    #mapBody{flex-direction:column;height:auto}
+    #mapLeft{height:52vh;min-height:300px}
+    #map{height:100%}
+    #mapRight{width:100%;border-left:none;border-top:1px solid var(--line)}
+    .mr-head,.mr-legend{padding-left:12px;padding-right:12px}
+  }
+</style>
+<!-- 地图：Leaflet 走同域名 lib/（与主站客户地图一致，不依赖外部 CDN，手机网络不可达 jsDelivr 时也能加载） -->
+<link rel="stylesheet" href="../lib/leaflet/leaflet.min.css">
+<script src="../lib/leaflet/leaflet.min.js"></script>
+</head>
+<body>
+<h1>🎯 汕头 POM 注塑客户线索（共聚甲醛原料目标企业）</h1>
+<div class="sub">采集日期：2026-08-18 ｜ 来源：公开工商/黄页/招聘/行业目录 ｜ 共 <b id="total">0</b> 家，已剔除 POM 原料经销商 ｜ 编辑删除实时存本地</div>
+
+<div class="stats">
+  <div class="stat"><b id="s-a">0</b><span>玩具牙箱/齿轮（高匹配）</span></div>
+  <div class="stat"><b id="s-b-">0</b><span>卫浴/马桶/洁具（中高匹配）</span></div>
+  <div class="stat"><b id="s-c-">0</b><span>通用注塑厂（潜在拓展）</span></div>
+  <div class="stat"><b id="s-phone">0</b><span>电话已核实（含隐藏待补）</span></div>
+</div>
+
+<div class="bar">
+  <button class="btn on" data-f="all">全部</button>
+  <button class="btn" data-f="A">玩具牙箱/齿轮</button>
+  <button class="btn" data-f="B">卫浴/马桶/洁具</button>
+  <button class="btn" data-f="C">通用注塑(潜在)</button>
+  <input class="search" id="q" placeholder="搜索表格：公司名 / 产品 / 区镇 / 地址…">
+  <button class="btn map" id="mapBtn">🗺 地图显示</button>
+  <button class="btn export" id="exp">⬇ 导出 CSV</button>
+  <button class="btn reset" id="reset">↺ 重置数据</button>
+  <span class="count" id="cnt"></span>
+</div>
+
+<!-- 地图面板：左地图 + 右详情/编辑 -->
+<div id="mapPanel">
+  <div id="mapBody">
+    <div id="mapLeft">
+      <div id="map"></div>
+      <div class="mapmsg" id="mapMsg">⚠️ 地图组件未能加载（可能无网络或 Leaflet 未能加载）。右侧列表与编辑功能不受影响。</div>
+    </div>
+    <div id="mapRight">
+      <div class="mr-head">
+        <h3>📍 客户分布区域图</h3>
+        <input class="mr-search" id="mq" placeholder="在地图上筛选：公司名 / 产品 / 区镇…">
+      </div>
+      <div class="mr-legend">
+        <span><i style="background:#22c55e"></i>牙箱齿轮</span>
+        <span><i style="background:#3b82f6"></i>卫浴洁具</span>
+        <span><i style="background:#94a3b8"></i>通用注塑</span>
+        <span><i style="background:#f59e0b"></i>当前选中</span>
+      </div>
+      <div class="mr-list" id="mrList"></div>
+      <div class="mr-detail" id="mrDetail" style="display:none"></div>
+      <div class="mr-edit" id="mrEdit" style="display:none">
+        <span class="back" onclick="backToDetail()">← 返回详情</span>
+        <h3 style="font-size:15px;margin-bottom:10px">✏️ 编辑客户</h3>
+        <div class="field"><label>公司名称</label><input id="mr-name"></div>
+        <div class="row2" style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label>联系人</label><input id="mr-contact"></div>
+          <div class="field" style="flex:1"><label>电话</label><input id="mr-phone"></div>
+        </div>
+        <div class="field"><label>产品 / 用料</label><input id="mr-product"></div>
+        <div class="field"><label>类别</label>
+          <select id="mr-cat">
+            <option value="A">A · 玩具牙箱/齿轮（高匹配）</option>
+            <option value="B">B · 卫浴/马桶/洁具（中高匹配）</option>
+            <option value="C">C · 通用注塑（潜在拓展）</option>
+          </select>
+        </div>
+        <div class="row2" style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label>区镇</label><input id="mr-town"></div>
+          <div class="field" style="flex:1"><label>详细地址</label><input id="mr-addr"></div>
+        </div>
+        <div class="row2" style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label>纬度</label><input id="mr-lat" type="number" step="0.0001"></div>
+          <div class="field" style="flex:1"><label>经度</label><input id="mr-lng" type="number" step="0.0001"></div>
+        </div>
+        <div class="field"><label>备注</label><textarea id="mr-note"></textarea></div>
+        <div class="mr-acts"><button class="btn save sm" onclick="saveMapEdit()">保存</button><button class="btn cancel sm" onclick="backToDetail()">取消</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tbl-wrap">
+<table>
+  <thead><tr>
+    <th>#</th><th>公司名称</th><th>联系人</th><th>电话</th><th>产品 / 用料</th>
+    <th>类别</th><th>区镇</th><th>详细地址</th><th>近似坐标(纬度,经度)</th><th>备注</th><th>操作</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+</div>
+
+<!-- 表格内编辑弹窗 -->
+<div id="modal">
+  <div class="card">
+    <h3>✏️ 编辑客户</h3>
+    <div class="field"><label>公司名称</label><input id="f-name"></div>
+    <div class="row2">
+      <div class="field"><label>联系人</label><input id="f-contact"></div>
+      <div class="field"><label>电话</label><input id="f-phone"></div>
+    </div>
+    <div class="field"><label>产品 / 用料</label><input id="f-product"></div>
+    <div class="field"><label>类别</label>
+      <select id="f-cat">
+        <option value="A">A · 玩具牙箱/齿轮（高匹配）</option>
+        <option value="B">B · 卫浴/马桶/洁具（中高匹配）</option>
+        <option value="C">C · 通用注塑（潜在拓展）</option>
+      </select>
+    </div>
+    <div class="row2">
+      <div class="field"><label>区镇</label><input id="f-town"></div>
+      <div class="field"><label>详细地址</label><input id="f-addr"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>纬度</label><input id="f-lat" type="number" step="0.0001"></div>
+      <div class="field"><label>经度</label><input id="f-lng" type="number" step="0.0001"></div>
+    </div>
+    <div class="field"><label>备注</label><textarea id="f-note"></textarea></div>
+    <div class="acts">
+      <button class="btn cancel sm" id="m-cancel">取消</button>
+      <button class="btn save sm" id="m-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+  <b>使用说明与重要声明：</b><br>
+  1. <b>类别</b>：A = 玩具牙箱/齿轮（POM 核心料，高匹配）；B = 卫浴/马桶/洁具；C = 通用注塑（潜在）。<br>
+  2. <b>地图用法</b>：点「🗺 地图显示」→ 左侧地图按类别着色标点，右侧为"客户分布区域图"列表；点标点或点列表项，即在右侧打开<b>客户详情</b>，可直接「编辑 / 删除」。坐标已自动 WGS-84→GCJ-02 对齐底图。<br>
+  3. <b>位置精度</b>：坐标为<b>镇/工业区近似中心点</b>。正式打点前请按"详细地址"用高德/腾讯重新地理编码到门牌级。<br>
+  4. <b>电话真实性</b>：标注"待核实"或"部分隐藏"的来自黄页脱敏，需复核补全。<br>
+  5. <b>编辑/删除</b>：行内或地图内操作即时生效并存浏览器本地（localStorage），刷新不丢；「重置数据」恢复初始 30 家；「导出 CSV」导出当前（含编辑后）数据。<br>
+  6. <b>已剔除</b>：英翔、鸣宇、义达、盟信、富荣达、日佳等 POM/工程塑料原料经销商（卖料方）。本表为销售线索初筛，拜访前结合工商状态与实地确认。
+</div>
+
+<script>
+const DEFAULTS = [
+ {name:"汕头市澄海区凤翔锦裕达塑料玩具配件厂",contact:"陈思楷",phone:"0754-85884535 / 13509877272",product:"牙箱、齿轮",cat:"A",town:"澄海区·凤翔街道",addr:"凤翔街道外埔新池四巷二号",lat:23.45,lng:116.76,note:""},
+ {name:"汕头市澄海区恒力冠玩具配件厂",contact:"林恒胜",phone:"0754-85136113 / 13380405002",product:"玩具牙箱、牙轮、玩具零件",cat:"A",town:"澄海区·莲下镇",addr:"莲下镇神州工业区（工商变更后迁隆都镇隆南路南侧东沟老鳗场）",lat:23.50,lng:116.78,note:"地址有迁址记录，联系前确认现址"},
+ {name:"广东乐嘉原精密科技有限公司（前身力源精密）",contact:"陈小姐",phone:"15817998861 / 0754-85853138",product:"精密齿轮、牙箱、积木砖块",cat:"A",town:"澄海区·澄华街道",addr:"澄华工业区文华路中段（源通塑胶玩具厂内第2幢厂房一层A区）",lat:23.47,lng:116.76,note:"前身为汕头力源精密科技，专注精密制造20年"},
+ {name:"广东美嘉源精密科技有限公司",contact:"林小姐",phone:"0754-85853138",product:"玩具齿轮、牙箱",cat:"A",town:"澄海区·澄华街道",addr:"澄华工业区文华路中段",lat:23.47,lng:116.76,note:"与乐嘉原同址同电话，疑似关联企业"},
+ {name:"汕头市澄海区莲下鸿盛五金塑料配件厂",contact:"杨涛",phone:"0754-85173838 / 13502711229",product:"塑胶牙箱、电动遥控玩具牙箱",cat:"A",town:"澄海区·莲下镇",addr:"莲下镇北湾村莲凤路南侧工业区",lat:23.50,lng:116.78,note:"1992年创办，鸿盛品牌"},
+ {name:"汕头市澄海区立凯精密齿轮",contact:"马弟",phone:"13923910019",product:"玩具精密齿轮、牙轮、注塑加工",cat:"A",town:"澄海区·莲下镇",addr:"莲下槐南工业区",lat:23.50,lng:116.78,note:"个体户，97人规模"},
+ {name:"汕头市金田生塑胶有限公司",contact:"待核实",phone:"13085790878",product:"玩具汽车齿轮、牙箱、塑料变速箱",cat:"A",town:"澄海区",addr:"澄海区（具体门牌待核实）",lat:23.46,lng:116.76,note:"1993年创立，占地2万㎡，地址未详"},
+ {name:"汕头市金佳日用制品有限公司",contact:"待核实",phone:"待核实",product:"塑胶传动齿轮、注塑件、潜水器材",cat:"A",town:"濠江区",addr:"濠江区（具体门牌待核实）",lat:23.33,lng:116.69,note:"港商独资，有CNC/注塑车间，电话需补"},
+
+ {name:"汕头市金平区佳诚日用品有限公司",contact:"待核实",phone:"0754-83936227",product:"卫浴产品、水暖器材、塑料制品",cat:"B",town:"金平区",addr:"金园工业城16-02-3片区",lat:23.37,lng:116.68,note:"2000年成立，注册资本100万"},
+ {name:"汕头市龙湖区古典卫浴有限公司",contact:"林国明",phone:"0754-8261815",product:"陶瓷制品、塑胶及塑料制品、卫浴",cat:"B",town:"龙湖区",addr:"龙湖工业区华山路轻工厂房F1底层北座",lat:23.38,lng:116.72,note:"1999年成立"},
+ {name:"汕头市金兴塑胶实业有限公司",contact:"肖国文",phone:"0754-88661548",product:"浴室用品、卫浴、家居塑胶",cat:"B",town:"金平区",addr:"汕樟路115号",lat:23.36,lng:116.68,note:"1998年成立，300万注册资本"},
+ {name:"汕头市震荣塑胶制品工艺厂",contact:"待核实",phone:"0754-88208118",product:"个人卫浴、护理、保健用具",cat:"B",town:"金平区",addr:"护堤路32号",lat:23.37,lng:116.68,note:"占地5000㎡，多台注塑机"},
+ {name:"汕头市高德卫浴有限公司",contact:"陈瑜芳",phone:"13902****08（部分隐藏）",product:"卫浴水暖、塑料制品",cat:"B",town:"龙湖区",addr:"练江南路6号龙湖工业区B3幢二层东侧",lat:23.38,lng:116.72,note:"手机尾号脱敏，需补全"},
+ {name:"汕头市达贺塑料五金制品有限公司",contact:"待核实",phone:"18929694536",product:"卫浴用具、塑料制品、沐浴用品",cat:"B",town:"潮南区·司马浦镇",addr:"司马浦大布下工业区",lat:23.25,lng:116.45,note:"2010年成立，年出口约700万"},
+ {name:"震丰卫浴厂",contact:"郭钦波",phone:"0754-86626089",product:"卫浴产品、水龙头、浴巾架",cat:"B",town:"潮阳区·海门镇",addr:"海门镇东门工业区",lat:23.23,lng:116.62,note:""},
+ {name:"汕头市潮南区成田佳艺卫浴厂",contact:"待核实",phone:"待核实",product:"卫浴五金、马桶/陶瓷洁具、花洒",cat:"B",town:"潮南区·成田镇",addr:"成田镇",lat:23.20,lng:116.47,note:"厂房约3000㎡，80人，无公开电话"},
+ {name:"汕头市潮阳区金灶鸿达卫浴制品厂",contact:"待核实",phone:"待核实",product:"马桶、洗手盆、浴室柜、浴缸",cat:"B",town:"潮阳区·金灶镇",addr:"金灶镇",lat:23.37,lng:116.65,note:"占地约5000㎡，年产约10万套，无公开电话"},
+ {name:"汕头市唐纳洁夫陶瓷卫浴实业有限公司",contact:"蔡振有",phone:"13536823551 / 0754-88430852",product:"座便器、蹲便器、陶瓷洁具",cat:"B",town:"金平区",addr:"华坞路201号",lat:23.37,lng:116.68,note:"专业生产陶瓷洁具"},
+ {name:"汕头市潮南区古月陶瓷有限公司",contact:"胡泽祥",phone:"0754-87785680",product:"陶瓷制品（卫浴相关）",cat:"B",town:"潮南区·峡山街道",addr:"峡山英大埔工业区",lat:23.25,lng:116.50,note:"2005年成立"},
+ {name:"美多裕休闲洁具有限公司",contact:"林经理",phone:"13926754400",product:"淋浴房、玻璃洁具、浴室门",cat:"B",town:"潮阳区·峡山街道",addr:"峡山镇广汕公路汕尾路段北1022-1024",lat:23.25,lng:116.50,note:""},
+ {name:"汕头瓷尚卫浴有限公司",contact:"蔡小姐",phone:"13923904711",product:"马桶、卫浴五金、浴室柜",cat:"B",town:"待核实（供应商名汕头）",addr:"地址待核实（产地标注潮州，供应商名汕头，需确认）",lat:23.46,lng:116.76,note:"产地疑为潮州，地址需落地确认"},
+ {name:"汕头市润鑫建材有限公司",contact:"林洽基",phone:"1371482****（部分隐藏）",product:"卫浴洁具（销售）、水暖配件",cat:"B",town:"潮阳区·谷饶镇",addr:"谷饶镇茂二工业区",lat:23.30,lng:116.43,note:"建材贸易为主，非注塑生产方，低优先"},
+ {name:"潮阳市银兴不锈钢制品有限公司",contact:"待核实",phone:"(0754)8828288",product:"洁具、不锈钢制品、日用制品",cat:"B",town:"潮阳区·棉北街道",addr:"棉北外经工业村",lat:23.36,lng:116.62,note:"不锈钢洁具，非POM主料"},
+
+ {name:"汕头市凯愉塑胶有限公司",contact:"冯万英",phone:"15915506400",product:"塑胶制品、卫生洁具、玩具",cat:"C",town:"澄海区·广益街道",addr:"广益街道华富居委会华春园79栋9号5楼",lat:23.47,lng:116.77,note:"2020年成立，含卫生洁具"},
+ {name:"汕头市澄海区三源塑胶制品厂",contact:"陈绍伟",phone:"0754-85331118",product:"塑胶制品",cat:"C",town:"澄海区·溪南镇",addr:"溪南狮山工业区",lat:23.55,lng:116.75,note:"2001年成立"},
+ {name:"汕头市澄海区宏基塑胶制品厂",contact:"赖玺丹",phone:"13353094255 / 0754-85637355",product:"卫浴套装、浴室四件套、塑胶家居",cat:"C",town:"澄海区·澄华街道",addr:"澄华街道西门中泰三路6号",lat:23.47,lng:116.76,note:"产卫浴套装，有POM潜在需求"},
+ {name:"汕头市荣光塑胶有限公司",contact:"林忠玉",phone:"0754-85749116",product:"塑胶制品、五金、模具、玩具",cat:"C",town:"澄海区·莲下镇",addr:"莲下镇程洋冈村南洋堤工业区",lat:23.50,lng:116.78,note:"2018年成立"},
+ {name:"澄海市澄华铧润达塑胶制品厂",contact:"蔡国华",phone:"(0754)5860152",product:"塑料制品、五金配件",cat:"C",town:"澄海区·澄华街道",addr:"澄华岭亭工业厂房A座",lat:23.47,lng:116.76,note:"1997年成立"},
+ {name:"汕头市潮南区司马浦佳信塑料制品厂",contact:"待核实",phone:"13790861661",product:"沐浴巾/棉、卫浴用品、无结网",cat:"C",town:"潮南区·司马浦镇",addr:"司马浦镇四片",lat:23.25,lng:116.45,note:"1993年创办，卫浴清洁用品"},
+ {name:"潮阳市丰展塑胶制品有限公司",contact:"王明基",phone:"(0754)8859808",product:"各式塑料制品",cat:"C",town:"潮南区·司马浦镇",addr:"司马浦镇东市场内",lat:23.25,lng:116.45,note:"1993年成立，320万注册资本"}
+];
+
+const LS_KEY="shantou_pom_customers_v2";
+let DATA = loadData();
+let cur="all", q="", mq="", selectedIdx=-1;
+let editIdx=-1;
+let mapReady=false, map=null, markers=null;
+
+function loadData(){
+  try{const s=localStorage.getItem(LS_KEY); if(s) return JSON.parse(s);}catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULTS));
+}
+function saveData(){ try{localStorage.setItem(LS_KEY, JSON.stringify(DATA));}catch(e){} }
+
+const CATMAP={A:["t-a","牙箱齿轮"],B:["t-b","卫浴洁具"],C:["t-c","通用注塑"]};
+const COLOR={A:"#22c55e",B:"#3b82f6",C:"#94a3b8"};
+const rows=document.getElementById("rows");
+
+function getTableView(){ return DATA.map((d,i)=>({d,i})).filter(o=>(cur==="all"||o.d.cat===cur)&&(!q||(o.d.name+o.d.product+o.d.town+o.d.addr).toLowerCase().includes(q.toLowerCase()))); }
+function getMapView(){ return DATA.map((d,i)=>({d,i})).filter(o=>(cur==="all"||o.d.cat===cur)&&(!mq||(o.d.name+o.d.product+o.d.town+o.d.addr).toLowerCase().includes(mq.toLowerCase()))); }
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function renderTable(){
+  const v=getTableView();
+  rows.innerHTML=v.map(({d,i})=>{
+    const [cls,label]=CATMAP[d.cat];
+    const ph=d.phone.includes("待核实")||d.phone.includes("****")?`<span class="badge-hide">${d.phone}</span>`:`<span class="phone">${d.phone}</span>`;
+    return `<tr>
+      <td>${i+1}</td><td class="nm">${esc(d.name)}</td><td>${esc(d.contact)}</td><td>${ph}</td>
+      <td>${esc(d.product)}</td><td><span class="tag ${cls}">${label}</span></td>
+      <td>${esc(d.town)}</td><td class="addr">${esc(d.addr)}</td>
+      <td class="coord">${d.lat}, ${d.lng}</td><td class="note">${esc(d.note||"")}</td>
+      <td class="op"><a onclick="openEdit(${i})">编辑</a><a class="del" onclick="delRow(${i})">删除</a></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("cnt").textContent=`显示 ${v.length} / ${DATA.length} 家`;
+}
+function stats(){
+  document.getElementById("s-a").textContent=DATA.filter(d=>d.cat==="A").length;
+  document.getElementById("s-b-").textContent=DATA.filter(d=>d.cat==="B").length;
+  document.getElementById("s-c-").textContent=DATA.filter(d=>d.cat==="C").length;
+  document.getElementById("s-phone").textContent=DATA.filter(d=>!d.phone.includes("待核实")).length;
+  document.getElementById("total").textContent=DATA.length;
+}
+
+/* ---------- 表格内 编辑/删除 ---------- */
+function openEdit(i){
+  editIdx=i; const d=DATA[i];
+  document.getElementById("f-name").value=d.name;
+  document.getElementById("f-contact").value=d.contact;
+  document.getElementById("f-phone").value=d.phone;
+  document.getElementById("f-product").value=d.product;
+  document.getElementById("f-cat").value=d.cat;
+  document.getElementById("f-town").value=d.town;
+  document.getElementById("f-addr").value=d.addr;
+  document.getElementById("f-lat").value=d.lat;
+  document.getElementById("f-lng").value=d.lng;
+  document.getElementById("f-note").value=d.note||"";
+  document.getElementById("modal").classList.add("show");
+}
+function closeModal(){document.getElementById("modal").classList.remove("show");editIdx=-1;}
+function saveEdit(){
+  if(editIdx<0) return; const d=DATA[editIdx];
+  d.name=document.getElementById("f-name").value.trim()||d.name;
+  d.contact=document.getElementById("f-contact").value.trim();
+  d.phone=document.getElementById("f-phone").value.trim();
+  d.product=document.getElementById("f-product").value.trim();
+  d.cat=document.getElementById("f-cat").value;
+  d.town=document.getElementById("f-town").value.trim();
+  d.addr=document.getElementById("f-addr").value.trim();
+  d.lat=parseFloat(document.getElementById("f-lat").value)||d.lat;
+  d.lng=parseFloat(document.getElementById("f-lng").value)||d.lng;
+  d.note=document.getElementById("f-note").value.trim();
+  saveData(); closeModal(); refreshAll();
+}
+function delRow(i){
+  if(!confirm("确认删除「"+DATA[i].name+"」？此操作存本地，可用「重置数据」恢复。")) return;
+  DATA.splice(i,1); saveData(); if(selectedIdx===i)selectedIdx=-1; refreshAll();
+}
+
+/* ---------- 地图（Leaflet + 高德 HTTPS 瓦片，零密钥无代理） ---------- */
+function pin(color){
+  const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='24' height='36' viewBox='0 0 24 36'><path d='M12 0C5.4 0 0 5.4 0 12c0 8 12 24 12 24s12-16 12-24c0-6.6-5.4-12-12-12z' fill='${color}'/><circle cx='12' cy='12' r='5' fill='#fff'/></svg>`;
+  return 'data:image/svg+xml,'+encodeURIComponent(svg);
+}
+function wgs2gcj(lng,lat){
+  const a=6378245.0,ee=0.00669342162296594323;
+  if(lng<72.004||lng>137.8347||lat<0.8293||lat>55.8271) return [lng,lat];
+  let dlat=transformlat(lng-105.0,lat-35.0), dlng=transformlng(lng-105.0,lat-35.0);
+  let radlat=lat/180.0*Math.PI, magic=Math.sin(radlat); magic=1-ee*magic*magic;
+  let sqrtmagic=Math.sqrt(magic);
+  dlat=(dlat*180.0)/((a*(1-ee))/(magic*sqrtmagic)*Math.PI);
+  dlng=(dlng*180.0)/(a/sqrtmagic*Math.cos(radlat)*Math.PI);
+  return [lng+dlng, lat+dlat];
+}
+function transformlat(x,y){let r=-100.0+2.0*x+3.0*y+0.2*y*y+0.1*x*y+0.2*Math.sqrt(Math.abs(x));r+=(20.0*Math.sin(6.0*x*Math.PI)+20.0*Math.sin(2.0*x*Math.PI))*2.0/3.0;r+=(20.0*Math.sin(y*Math.PI)+40.0*Math.sin(y/3.0*Math.PI))*2.0/3.0;r+=(160.0*Math.sin(y/12.0*Math.PI)+320*Math.sin(y*Math.PI/30.0))*2.0/3.0;return r;}
+function transformlng(x,y){let r=300.0+x+2.0*y+0.1*x*x+0.1*x*y+0.1*Math.sqrt(Math.abs(x));r+=(20.0*Math.sin(6.0*x*Math.PI)+20.0*Math.sin(2.0*x*Math.PI))*2.0/3.0;r+=(20.0*Math.sin(x*Math.PI)+40.0*Math.sin(x/3.0*Math.PI))*2.0/3.0;r+=(150.0*Math.sin(x/12.0*Math.PI)+300.0*Math.sin(x/30.0*Math.PI))*2.0/3.0;return r;}
+
+function ensureMap(){
+  if(mapReady) return;
+  if(typeof L==="undefined"){ document.getElementById("mapMsg").style.display="block"; return; }
+  map=L.map("map",{zoom:11, center:[23.374,116.685]});
+  // 瓦片用 webrd0{s}（与主站客户地图一致，手机验证可用）；加 errorTileUrl 离线兜底
+  L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{subdomains:'1234',maxZoom:18,errorTileUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',attribution:'高德地图'}).addTo(map);
+  markers=L.layerGroup().addTo(map);
+  mapReady=true;
+  renderMap(); renderMapRight();
+  map.on('zoomend', renderMap); // 缩放时按像素距离重新聚类（重叠合并）
+  // 兜底：容器从隐藏→显示后，leaflet 必须重算尺寸，否则瓦片空白
+  setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} },50);
+}
+function renderMap(){
+  if(!mapReady||!markers) return;
+  markers.clearLayers();
+  const v=getMapView();
+  if(!v.length) return;
+  // 像素距离聚类（重叠合并）：把屏幕上距离 ≤26px 的客户合成一个气泡，缩放时自动聚合/展开
+  const OVERLAP_PX=26;
+  const pts=v.map(({d,i})=>{
+    const gcj=wgs2gcj(d.lng,d.lat);
+    let px={x:0,y:0};
+    try{ px=map.latLngToLayerPoint(L.latLng(gcj[1],gcj[0])); }catch(e){}
+    return {d,i,gcj,px};
+  });
+  const used=new Array(pts.length).fill(false);
+  const clusters=[];
+  for(let a=0;a<pts.length;a++){
+    if(used[a]) continue;
+    const group=[pts[a]]; used[a]=true;
+    for(let b=0;b<pts.length;b++){
+      if(used[b]) continue;
+      for(const g of group){
+        const dx=g.px.x-pts[b].px.x, dy=g.px.y-pts[b].px.y;
+        if(Math.sqrt(dx*dx+dy*dy)<=OVERLAP_PX){ group.push(pts[b]); used[b]=true; break; }
+      }
+    }
+    clusters.push(group);
+  }
+  clusters.forEach(group=>{
+    if(group.length===1){
+      const {d,i,gcj}=group[0];
+      const color=i===selectedIdx?"#f59e0b":COLOR[d.cat];
+      const m=L.marker([gcj[1],gcj[0]],{icon:L.icon({iconUrl:pin(color),iconSize:[24,36],iconAnchor:[12,36]})});
+      m.on("click",()=>selectCustomer(i));
+      markers.addLayer(m);
+    } else {
+      const cLat=group.reduce((s,p)=>s+p.gcj[1],0)/group.length;
+      const cLng=group.reduce((s,p)=>s+p.gcj[0],0)/group.length;
+      const badge=L.divIcon({className:'cm-cluster',html:'<div style="background:#6366f1;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid #fff">'+group.length+'</div>',iconSize:[36,36],iconAnchor:[18,18]});
+      const m=L.marker([cLat,cLng],{icon:badge});
+      let html='<div style="min-width:220px;max-width:320px;max-height:260px;overflow-y:auto"><div style="font-weight:600;font-size:13px;color:#6366f1;margin-bottom:8px">📍 此区域有 '+group.length+' 位客户</div>';
+      group.forEach(p=>{ html+='<div style="padding:6px 8px;margin-bottom:4px;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="selectCustomer('+p.i+')">'+esc(p.d.name)+'</div>'; });
+      html+='</div>';
+      m.bindPopup(html);
+      markers.addLayer(m);
+    }
+  });
+}
+function renderMapRight(){
+  const v=getMapView();
+  const list=document.getElementById("mrList");
+  if(selectedIdx>=0){ list.style.display="none"; renderDetail(); return; }
+  list.style.display="block";
+  document.getElementById("mrDetail").style.display="none";
+  document.getElementById("mrEdit").style.display="none";
+  list.innerHTML=v.map(({d,i})=>{
+    const [cls,label]=CATMAP[d.cat];
+    return `<div class="mr-item" onclick="selectCustomer(${i})">
+      <div class="nm">${esc(d.name)}</div>
+      <div class="sub"><span class="tag ${cls}">${label}</span> ${esc(d.town)}</div>
+    </div>`;
+  }).join("") || `<div class="sub" style="padding:14px;color:var(--muted)">无匹配客户</div>`;
+}
+function selectCustomer(i){
+  selectedIdx=i;
+  if(mapReady) map.closePopup(); // 关掉聚合气泡弹窗，避免遮挡
+  renderMapRight(); renderMap();
+  if(mapReady){
+    const d=DATA[i], gcj=wgs2gcj(d.lng,d.lat);
+    try{ map.panTo([gcj[1],gcj[0]]); if(map.getZoom()<13) map.setZoom(14); }catch(e){}
+  }
+}
+function renderDetail(){
+  if(selectedIdx<0) return;
+  const d=DATA[selectedIdx]; const [cls,label]=CATMAP[d.cat];
+  const ph=d.phone.includes("待核实")||d.phone.includes("****")?`<span class="badge-hide">${esc(d.phone)}</span>`:`<span class="phone">${esc(d.phone)}</span>`;
+  document.getElementById("mrDetail").innerHTML=`
+    <span class="back" onclick="backToList()">← 返回列表</span>
+    <div class="ttl">${esc(d.name)}</div>
+    <span class="tag ${cls}">${label}</span>
+    <div class="dl" style="margin-top:12px"><b>联系人</b> ${esc(d.contact)}</div>
+    <div class="dl"><b>电话</b> ${ph}</div>
+    <div class="dl"><b>产品</b> ${esc(d.product)}</div>
+    <div class="dl"><b>区镇</b> ${esc(d.town)}</div>
+    <div class="dl"><b>地址</b> ${esc(d.addr)}</div>
+    <div class="dl"><b>坐标</b> <span class="coord">${d.lat}, ${d.lng}</span></div>
+    ${d.note?`<div class="dl"><b>备注</b> <span class="note">${esc(d.note)}</span></div>`:""}
+    <div class="mr-acts">
+      <button class="btn save sm" onclick="openMapEdit()">✏️ 编辑</button>
+      <button class="btn cancel sm" onclick="delMapRow()">🗑 删除</button>
+    </div>`;
+  document.getElementById("mrDetail").style.display="block";
+  document.getElementById("mrEdit").style.display="none";
+}
+function backToList(){ selectedIdx=-1; renderMapRight(); renderMap(); }
+function backToDetail(){ document.getElementById("mrEdit").style.display="none"; renderDetail(); }
+function openMapEdit(){
+  if(selectedIdx<0) return; const d=DATA[selectedIdx];
+  document.getElementById("mr-name").value=d.name;
+  document.getElementById("mr-contact").value=d.contact;
+  document.getElementById("mr-phone").value=d.phone;
+  document.getElementById("mr-product").value=d.product;
+  document.getElementById("mr-cat").value=d.cat;
+  document.getElementById("mr-town").value=d.town;
+  document.getElementById("mr-addr").value=d.addr;
+  document.getElementById("mr-lat").value=d.lat;
+  document.getElementById("mr-lng").value=d.lng;
+  document.getElementById("mr-note").value=d.note||"";
+  document.getElementById("mrDetail").style.display="none";
+  document.getElementById("mrEdit").style.display="block";
+}
+function saveMapEdit(){
+  if(selectedIdx<0) return; const d=DATA[selectedIdx];
+  d.name=document.getElementById("mr-name").value.trim()||d.name;
+  d.contact=document.getElementById("mr-contact").value.trim();
+  d.phone=document.getElementById("mr-phone").value.trim();
+  d.product=document.getElementById("mr-product").value.trim();
+  d.cat=document.getElementById("mr-cat").value;
+  d.town=document.getElementById("mr-town").value.trim();
+  d.addr=document.getElementById("mr-addr").value.trim();
+  d.lat=parseFloat(document.getElementById("mr-lat").value)||d.lat;
+  d.lng=parseFloat(document.getElementById("mr-lng").value)||d.lng;
+  d.note=document.getElementById("mr-note").value.trim();
+  saveData(); refreshAll(); renderDetail();
+}
+function delMapRow(){
+  if(selectedIdx<0) return;
+  if(!confirm("确认删除「"+DATA[selectedIdx].name+"」？此操作存本地，可用「重置数据」恢复。")) return;
+  DATA.splice(selectedIdx,1); saveData(); selectedIdx=-1; refreshAll();
+}
+
+/* ---------- 总刷新 ---------- */
+function refreshAll(){ stats(); renderTable(); if(mapReady){ renderMap(); renderMapRight(); } }
+
+/* ---------- 事件 ---------- */
+document.querySelectorAll(".btn[data-f]").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".btn[data-f]").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");cur=b.dataset.f;refreshAll();
+});
+document.getElementById("q").oninput=e=>{q=e.target.value;renderTable();};
+document.getElementById("mq").oninput=e=>{mq=e.target.value;renderMap();renderMapRight();};
+document.getElementById("mapBtn").onclick=()=>{
+  const p=document.getElementById("mapPanel");
+  const show=!p.classList.contains("show");
+  p.classList.toggle("show",show);
+  if(show){ document.getElementById("mapBtn").classList.add("on"); ensureMap(); setTimeout(()=>map&&map.invalidateSize&&map.invalidateSize(),200); }
+  else document.getElementById("mapBtn").classList.remove("on");
+};
+document.getElementById("exp").onclick=()=>{
+  const head=["公司名称","联系人","电话","产品用料","类别","区镇","详细地址","纬度","经度","备注"];
+  const catname={A:"玩具牙箱齿轮",B:"卫浴马桶洁具",C:"通用注塑潜在"};
+  const lines=[head.join(",")];
+  DATA.forEach(d=>lines.push([d.name,d.contact,d.phone,d.product,catname[d.cat],d.town,d.addr,d.lat,d.lng,d.note].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(",")));
+  const blob=new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="汕头POM客户线索_含经纬度.csv";a.click();
+};
+document.getElementById("reset").onclick=()=>{
+  if(!confirm("确定恢复初始 30 家数据？你当前的编辑/删除将被清空。")) return;
+  DATA=JSON.parse(JSON.stringify(DEFAULTS)); saveData(); selectedIdx=-1; refreshAll();
+};
+document.getElementById("m-cancel").onclick=closeModal;
+document.getElementById("m-save").onclick=saveEdit;
+document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeModal();});
+
+stats(); renderTable();
+</script>
+</body>
+</html>
