@@ -446,9 +446,51 @@ body {
 .stats-pw input:focus { border-color: var(--accent); }
 .stats-pw button { padding: 8px 28px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
 .stats-pw .err { color: #ef4444; font-size: 12px; display: none; }
+/* ===== 全站门禁遮罩（方案A） ===== */
+.site-lock {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.site-lock-dialog {
+  width: 360px; max-width: 88vw; padding: 36px 32px;
+  background: #ffffff; border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center;
+}
+.site-lock-icon { font-size: 44px; margin-bottom: 8px; }
+.site-lock-title { font-size: 22px; color: #1e293b; margin-bottom: 6px; font-weight: 700; }
+.site-lock-sub { font-size: 13px; color: #64748b; margin-bottom: 22px; line-height: 1.5; }
+.site-lock-input {
+  width: 100%; padding: 12px 14px; font-size: 15px;
+  border: 1px solid #e2e8f0; border-radius: 8px; outline: none;
+  box-sizing: border-box; margin-bottom: 14px; transition: border-color .15s;
+}
+.site-lock-input:focus { border-color: #0F766E; }
+.site-lock-btn {
+  width: 100%; padding: 12px; font-size: 15px; font-weight: 600;
+  background: #0F766E; color: #fff; border: none; border-radius: 8px;
+  cursor: pointer; transition: background .15s;
+}
+.site-lock-btn:hover { background: #0d6559; }
+.site-lock-err { color: #ef4444; font-size: 13px; margin-top: 12px; min-height: 16px; }
+.site-lock-hint { color: #94a3b8; font-size: 11px; margin-top: 16px; }
+.site-lock.hidden { display: none; }
 </style>
 </head>
 <body>
+<!-- ===== 全站门禁遮罩（方案A：打开网页即要求密码，未解锁不渲染任何内容） ===== -->
+<div class="site-lock" id="siteLock">
+  <div class="site-lock-dialog">
+    <div class="site-lock-icon">🔐</div>
+    <h2 class="site-lock-title">POM 知识库</h2>
+    <p class="site-lock-sub">本知识库已启用全站加密访问，请输入访问口令</p>
+    <input type="password" id="siteLockInput" class="site-lock-input" placeholder="请输入访问口令" autocomplete="off" />
+    <button id="siteLockBtn" class="site-lock-btn" onclick="siteLockSubmit()">解 锁</button>
+    <div class="site-lock-err" id="siteLockErr"></div>
+    <div class="site-lock-hint">口令错误请重试 · 关闭本页后需重新输入</div>
+  </div>
+</div>
 <div class="sidebar">
   <div class="sidebar-header" onclick="goHome()">
     <h1>POM 知识库</h1>
@@ -618,6 +660,77 @@ function pomRestoreUnlock() {
 }
 pomRestoreUnlock();
 
+/* ===== 全站门禁（方案A：打开网页即要求密码，整站可见性由会话态 siteUnlocked 控制） =====
+   设计要点：
+   1. 未解锁时整个 .sidebar / .main 被 #siteLock 遮罩盖住，且 init() 不 fetch/render 任何内容；
+   2. 解锁态写入 sessionStorage，刷新/切分类/新标签均免重输；关闭浏览器标签页（会话结束）即失效；
+   3. 本地 localhost 注入 __KB_LOCAL_MASTER__ 时免密直过（教授本地无感）；
+   4. 线上无明文口令：用户输入后用 data-index.json 的 probe 字段（与 04/05/06 同算法加密的 POM_PROBE_OK）校验；
+   5. 主密钥绝不落公开前端文件，仅本地注入。 */
+var POM_SITE_UNLOCK_KEY = 'pom_kb_site_unlock_v1';
+var siteUnlocked = false;
+
+function siteLockShow() {
+  var el = document.getElementById('siteLock');
+  if (el) el.classList.remove('hidden');
+}
+function siteLockHide() {
+  var el = document.getElementById('siteLock');
+  if (el) el.classList.add('hidden');
+}
+function siteLockSave() {
+  try { sessionStorage.setItem(POM_SITE_UNLOCK_KEY, '1'); } catch (e) {}
+}
+function siteLockRestore() {
+  try { if (sessionStorage.getItem(POM_SITE_UNLOCK_KEY) === '1') siteUnlocked = true; } catch (e) {}
+}
+function siteLockSetErr(msg) {
+  var el = document.getElementById('siteLockErr');
+  if (el) el.textContent = msg || '';
+}
+// 同步验证一次口令：拿它去解 data-index 的 probe（POM_PROBE_OK）。返回 true/false。
+async function siteLockVerify(password) {
+  try {
+    var res = await fetch('data-index.json?t=' + Date.now());
+    var idx = await res.json();
+    var probe = idx && idx.probe ? idx.probe : '';
+    if (!probe) { // 无探针则任何非空口令放行（兜底，正常构建必有 probe）
+      return !!password;
+    }
+    var t = await decryptText(probe, password);
+    return t === 'POM_PROBE_OK';
+  } catch (e) {
+    return false;
+  }
+}
+async function siteLockSubmit() {
+  var input = document.getElementById('siteLockInput');
+  var pwd = input ? input.value : '';
+  if (!pwd) { siteLockSetErr('请输入访问口令'); return; }
+  // 本地免密分支：注入变量直接过，无需网络校验
+  if (window.__KB_LOCAL_MASTER__) {
+    var okLocal = await siteLockVerify(window.__KB_LOCAL_MASTER__);
+    if (okLocal) {
+      siteUnlocked = true; accessPassword = window.__KB_LOCAL_MASTER__;
+      siteLockSave(); siteLockHide(); return;
+    }
+  }
+  var ok = await siteLockVerify(pwd);
+  if (ok) {
+    siteUnlocked = true; accessPassword = pwd; pomDerivedKey = null;
+    siteLockSave(); siteLockHide();
+  } else {
+    siteLockSetErr('口令错误，无法访问知识库');
+    if (input) input.value = '';
+  }
+}
+// 支持回车提交
+document.addEventListener('keydown', function(e) {
+  if (e && e.key === 'Enter' && document.getElementById('siteLock') && !document.getElementById('siteLock').classList.contains('hidden')) {
+    siteLockSubmit();
+  }
+});
+
 /* 按需懒加载脚本（P1 首屏瘦身：地图数据 / 截图库用到时才下载） */
 function loadScript(src) {
   return new Promise(function(resolve, reject) {
@@ -685,6 +798,7 @@ function isProtected(catKey) {
 
 async function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
+  if (siteUnlocked) { unlocked = true; callback(); return; } // 全站门禁已解锁：分类级直接放行
   if (unlocked) { callback(); return; }
   // 本地免密：仅当本地 server 注入了 __KB_LOCAL_MASTER__（localhost 访问时）才走此分支；
   // 线上公网域名不注入该变量，自动跳过，仍弹窗输口令。主密钥不落公开前端文件。
@@ -823,6 +937,19 @@ function shouldShowSyncButton() {
 
 async function init() {
   try {
+    // ===== 全站门禁（方案A）：未解锁先弹遮罩，不 fetch / 不 render 任何内容 =====
+    siteLockRestore();
+    // 本地免密：注入了 __KB_LOCAL_MASTER__ 时自动解锁（教授本地无感）
+    if (!siteUnlocked && window.__KB_LOCAL_MASTER__) {
+      var okLocal = await siteLockVerify(window.__KB_LOCAL_MASTER__);
+      if (okLocal) { siteUnlocked = true; accessPassword = window.__KB_LOCAL_MASTER__; siteLockSave(); }
+    }
+    if (!siteUnlocked) {
+      siteLockShow();
+      return; // 阻断后续数据加载与渲染，满足“打开就要密码、看不到内容”
+    }
+    siteLockHide();
+
     var syncBtn = document.getElementById('syncOnlineBtn');
     if (syncBtn && shouldShowSyncButton()) syncBtn.style.display = '';
     var res = await fetch('data-index.json');
