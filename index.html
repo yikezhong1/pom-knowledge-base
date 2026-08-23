@@ -691,7 +691,7 @@ function siteLockSetErr(msg) {
 // 同步验证一次口令：拿它去解 data-index 的 probe（POM_PROBE_OK）。返回 true/false。
 async function siteLockVerify(password) {
   try {
-    var res = await fetchKB('data-index.json?t=' + Date.now());
+    var res = await fetch('data-index.json?t=' + Date.now());
     var idx = await res.json();
     var probe = idx && idx.probe ? idx.probe : '';
     if (!probe) { // 无探针则任何非空口令放行（兜底，正常构建必有 probe）
@@ -907,35 +907,10 @@ window.addEventListener('hashchange', function() {
   }
 });
 
-/* 2026-08-22 修复：首屏/分类/门禁验证原只依赖 GitHub Pages 同域(github.io)，
-   国内网络下常超时(pending而非报错)，页面永远"加载中"或输密码无反应。
-   改为「jsDelivr 国内可达源优先 + 同域兜底 + 超时保护」。 */
-var KB_CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/';
-async function fetchKB(name, timeout) {
-  timeout = timeout || 8000;
-  var sources = [KB_CDN + name, name]; // jsDelivr 优先，同域 github.io 兜底
-  var lastErr;
-  for (var i = 0; i < sources.length; i++) {
-    var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, timeout);
-    try {
-      var res = await fetch(sources[i], { signal: ctrl.signal });
-      clearTimeout(timer);
-      if (res.ok) return res;
-      console.warn('[fetchKB] 非200:', sources[i], res.status);
-    } catch (e) {
-      clearTimeout(timer);
-      lastErr = e;
-      console.warn('[fetchKB] 失败:', sources[i], (e && e.message) || e);
-    }
-  }
-  throw new Error('所有数据源加载失败: ' + name + (lastErr ? ' (' + (lastErr.message || lastErr) + ')' : ''));
-}
-
 async function ensureCategory(catKey) {
   if (loadedCats[catKey] || !kbData || !kbData.categories || !kbData.categories[catKey]) return;
   try {
-    var res = await fetchKB('cat-' + encodeURIComponent(catKey) + '.json');
+    var res = await fetch('cat-' + encodeURIComponent(catKey) + '.json');
     if (!res.ok) {
       /* 2026-08-01 整改：原先静默 return，分类打不开时页面一片空白、用户无从判断 */
       console.warn('分类内容加载失败 HTTP ' + res.status + ' : ' + catKey);
@@ -977,7 +952,7 @@ async function init() {
 
     var syncBtn = document.getElementById('syncOnlineBtn');
     if (syncBtn && shouldShowSyncButton()) syncBtn.style.display = '';
-    var res = await fetchKB('data-index.json');
+    var res = await fetch('data-index.json');
     kbData = await res.json();
     loadedCats = {};
     buildSearchIndex();
@@ -996,7 +971,7 @@ async function init() {
 
 async function refreshData() {
   try {
-    var res = await fetchKB('data-index.json?t=' + Date.now());
+    var res = await fetch('data-index.json?t=' + Date.now());
     kbData = await res.json();
     loadedCats = {};
     await loadCustomers();
