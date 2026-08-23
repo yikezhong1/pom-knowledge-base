@@ -717,8 +717,12 @@ async function siteLockSubmit() {
   }
   var ok = await siteLockVerify(pwd);
   if (ok) {
-    siteUnlocked = true; accessPassword = pwd; pomDerivedKey = null;
-    siteLockSave(); siteLockHide();
+    /* 2026-08-23 修复(Bug B)：原先只写 siteLockSave()(仅记"站点已解锁")，未持久化 accessPassword。
+       每次部署后 service worker 让页面重载，重载时 siteUnlocked 从 session 恢复，但 accessPassword 为空，
+       导致加密分类(04/05/06)内容解密失败(白屏/红字)。这里同步置 unlocked=true 并 pomSaveUnlock()，
+       使口令随会话存入 sessionStorage，重载后 pomRestoreUnlock 能恢复，加密内容照常解开。 */
+    siteUnlocked = true; unlocked = true; accessPassword = pwd; pomDerivedKey = null;
+    siteLockSave(); pomSaveUnlock(); siteLockHide();
   } else {
     siteLockSetErr('口令错误，无法访问知识库');
     if (input) input.value = '';
@@ -1460,6 +1464,9 @@ function findFileInCat(cat, filename, subfolder) {
 }
 
 async function openFile(category, filename, subfolder) {
+  /* 2026-08-23 修复(Bug A 配套)：subfolder 可能来自 onclick(已 encodeURIComponent) 或 hash 路由(已解码)，
+     统一还原为原始值，保证 currentFile.subfolder 与数据一致、findFileInCat 精确匹配生效。 */
+  subfolder = subfolder ? decodeURIComponent(subfolder) : '';
   if (isProtected(category) && !unlocked) {
     requireUnlock(category, function() { openFile(category, filename, subfolder); });
     return;
@@ -1468,7 +1475,12 @@ async function openFile(category, filename, subfolder) {
   destroyMap();
   currentFile = { category: category, filename: filename, subfolder: subfolder || '' };
   /* 更新 URL 哈希，支持分享/收藏/前进后退 */
-  var hashPath = '#/' + encodeURIComponent(category) + '/' + (subfolder ? encodeURIComponent(subfolder) + '/' : '') + encodeURIComponent(filename);
+  /* 2026-08-23 修复(Bug A)：侧栏 onclick 已对子目录做过一次 encodeURIComponent，
+     openFile 这里若再 encode 一次会变成双重编码，使 location.hash 每次重写都再编码，
+     触发无限 hashchange 循环（子目录文件点开"跳回/没了"）。统一：先 decode 还原再单次 encode，
+     保证从 onclick(已编码) 或 navigateFromHash(已解码) 进入都得到稳定且一致的 hash。 */
+  var subfolderForHash = subfolder ? decodeURIComponent(subfolder) : '';
+  var hashPath = '#/' + encodeURIComponent(category) + '/' + (subfolderForHash ? encodeURIComponent(subfolderForHash) + '/' : '') + encodeURIComponent(filename);
   if (location.hash !== hashPath) location.hash = hashPath;
   renderSidebar(document.getElementById('searchInput').value.trim());
   var content = document.getElementById('contentWrap');
