@@ -4,10 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POM 聚甲醛知识库</title>
+<!-- 2026-08-24 性能优化：preconnect 提前建立 jsDelivr 连接，省 TLS+DNS 耗时 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 <script src="marked.min.js" defer></script>
 <script src="purify.min.js" defer></script>
-  <script src="fuse.min.js" defer></script>
-  <script src="lib/xlsx.full.min.js" defer></script>
+<script src="fuse.min.js" defer></script>
+<!-- 2026-08-24 性能优化：xlsx.full.min.js 881KB 改为按需懒加载（仅"导出客户档案"按钮触发），首屏不再阻塞 DOMContentLoaded -->
+<!-- <script src="lib/xlsx.full.min.js" defer></script> -->
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -1990,8 +1994,14 @@ function showCustomerTable() {
   document.getElementById('contentWrap').scrollTop = 0;
 }
 
-function exportCustomersXLSX() {
-  if (typeof XLSX === 'undefined') { showToast('导出组件未加载，请刷新页面后重试'); return; }
+async function exportCustomersXLSX() {
+  /* 2026-08-24 性能优化：xlsx.full.min.js 881KB 改按需懒加载，首屏不再 defer 阻塞 */
+  if (typeof XLSX === 'undefined') {
+    showToast('正在加载导出组件，请稍候...');
+    try { await loadScript('lib/xlsx.full.min.js'); }
+    catch (e) { showToast('导出组件加载失败，请检查网络后重试'); return; }
+    if (typeof XLSX === 'undefined') { showToast('导出组件加载异常'); return; }
+  }
   var cat = (kbData && kbData.categories) ? kbData.categories['04-客户档案'] : null;
   var records = (cat && cat._customerRecords) ? cat._customerRecords : [];
   if (!records.length) { showToast('暂无客户档案可导出'); return; }
