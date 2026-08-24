@@ -3160,8 +3160,20 @@ setTimeout(trackVisit, 2000);
 if (location.search.indexOf('stats') >= 0) { openStats(); }
 
 /* ===== Service Worker 缓存 ===== */
+/* SW 自愈（2026-08-24 紧急修复）：若浏览器已注册的 SW 版本与当前页面内置版本不一致，
+   说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
+   主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(function() {});
+  var KB_SW_VERSION = 'pom-kb-202608242231';
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(r) {
+      var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
+      if (url && KB_SW_VERSION && url.indexOf(KB_SW_VERSION) < 0) {
+        r.unregister().then(function() { location.reload(); });
+      }
+    });
+  }).catch(function() {});
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function() {});
 }
 </script>
 <!-- 网页截图依赖 html2canvas：改为点击截图按钮时按需懒加载，避免首屏下载 198KB -->
