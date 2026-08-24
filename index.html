@@ -7,9 +7,6 @@
 <!-- 2026-08-24 性能优化：preconnect 提前建立 jsDelivr 连接，省 TLS+DNS 耗时 -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-<!-- 2026-08-24 U2：首屏必需资源 preload，缩短可交互时间 -->
-<link rel="preload" href="data-index.json" as="fetch" crossorigin>
-<link rel="preload" href="marked.min.js" as="script">
 <script src="marked.min.js" defer></script>
 <script src="purify.min.js" defer></script>
 <script src="fuse.min.js" defer></script>
@@ -689,15 +686,10 @@ function buildSearchIndex(appendOnly) {
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
 var API_TOKEN = 'becf56d2932455e955eb5510d96bc29b91795b70538220d2878c21b9d2bb9753';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
-function fcReq(url, init) {  /* 自动注入 Bearer 令牌 + HMAC 时间戳签名（S2a 整改 2026-08-24：防 Token 被扒后重放） */
+function fcReq(url, init) {  /* 自动注入 Bearer 令牌（S2a 签名整改暂缓：FC 端 CORS 未放行 X-Timestamp/X-Sign，触发 preflight 失败；待 FC 端配套后再启用签名） */
   init = init || {};
-  var ts = Date.now().toString();
-  var sign = '';
-  try { sign = CryptoJS.HmacSHA256(ts, API_TOKEN).toString(); } catch (e) { sign = ''; }
   init.headers = Object.assign({
-    'Authorization': 'Bearer ' + API_TOKEN,
-    'X-Timestamp': ts,
-    'X-Sign': sign
+    'Authorization': 'Bearer ' + API_TOKEN
   }, init.headers || {});
   return fetch(url, init);
 }
@@ -796,6 +788,7 @@ async function siteLockSubmit() {
        使口令随会话存入 sessionStorage，重载后 pomRestoreUnlock 能恢复，加密内容照常解开。 */
     siteUnlocked = true; unlocked = true; accessPassword = pwd; pomDerivedKey = null;
     siteLockSave(); pomSaveUnlock(); siteLockHide();
+    init(); /* B1 修复 2026-08-24：全站门禁解锁后重新触发 init() 跑 fetchKB/renderSidebar，否则首屏永久"加载中"且侧栏空白 */
   } else {
     siteLockSetErr('口令错误，无法访问知识库');
     if (input) input.value = '';
