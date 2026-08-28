@@ -1,6 +1,4 @@
-var CACHE_NAME = 'pom-kb-202608242231';
-/* 2026-08-24 升 v4：v3 缓存了 Bug A 修复前的旧 index.html，导致教授"看不到"23日日报。
-   升版本号让旧 SW 激活时清掉 v3 缓存，强制重新拉取含 Bug A 修复的新 index.html。 */
+var CACHE_NAME = 'pom-kb-202608280944';
 /* 预缓存骨架：导航页 + JS 库。数据文件(data-index.json / cat-*.json)走运行时懒加载缓存 */
 var CACHE_URLS = ['index.html', 'marked.min.js', 'purify.min.js', 'fuse.min.js', 'lib/leaflet/leaflet.min.css', 'lib/leaflet/leaflet.min.js'];
 
