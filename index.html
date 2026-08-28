@@ -4,14 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POM 聚甲醛知识库</title>
-<!-- 2026-08-24 性能优化：preconnect 提前建立 jsDelivr 连接，省 TLS+DNS 耗时 -->
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 <script src="marked.min.js" defer></script>
 <script src="purify.min.js" defer></script>
-<script src="fuse.min.js" defer></script>
-<!-- 2026-08-24 性能优化：xlsx.full.min.js 881KB 改为按需懒加载（仅"导出客户档案"按钮触发），首屏不再阻塞 DOMContentLoaded -->
-<!-- <script src="lib/xlsx.full.min.js" defer></script> -->
+  <script src="fuse.min.js" defer></script>
+  <script src="lib/xlsx.full.min.js" defer></script>
 <style>
 :root {
   --bg-primary: #f8f9fa;
@@ -289,12 +285,6 @@ body {
 .pw-dialog .pw-confirm { background: var(--accent); color: #fff; }
 .pw-dialog .pw-confirm:hover { background: #1d4ed8; }
 .pw-dialog .pw-error { color: #ef4444; font-size: 12px; margin-top: 8px; display: none; }
-.pw-dialog .pw-error.show { display: block; }
-/* U1 2026-08-24：加密分类弹窗的输入框与密码可见切换 */
-.cat-lock-input { width: 100%; padding: 10px 40px 10px 14px; border: 2px solid var(--border); border-radius: 8px; font-size: 15px; text-align: center; outline: none; transition: border .2s; letter-spacing: 2px; }
-.cat-lock-input:focus { border-color: var(--accent); }
-.cat-lock-input.error { border-color: #ef4444; animation: shake .3s; }
-.cat-lock-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 4px; }
 /* 文件内容 */
 .file-meta {
   display: flex; align-items: center; gap: 16px; padding: 10px 16px;
@@ -501,23 +491,6 @@ body {
     <div class="site-lock-hint">口令错误请重试 · 关闭本页后需重新输入</div>
   </div>
 </div>
-<!-- ===== 加密分类访问弹窗（U1 2026-08-24：复用 .pw-overlay 风格，替代原生 prompt） ===== -->
-<div class="pw-overlay" id="catLock">
-  <div class="pw-dialog">
-    <div class="pw-icon">🔐</div>
-    <h3>加密内容</h3>
-    <div class="pw-desc">该分类为加密内容，请输入访问口令</div>
-    <div style="position:relative">
-      <input type="password" id="catLockInput" class="cat-lock-input" placeholder="请输入访问口令" autocomplete="off" />
-      <button type="button" id="catLockToggle" class="cat-lock-toggle" onclick="catLockToggleVis()" aria-label="显示/隐藏口令">👁</button>
-    </div>
-    <div class="pw-btns">
-      <button class="pw-cancel" onclick="catLockCancel()">取消</button>
-      <button class="pw-confirm" onclick="catLockSubmit()">解 锁</button>
-    </div>
-    <div class="pw-error" id="catLockErr"></div>
-  </div>
-</div>
 <div class="sidebar">
   <div class="sidebar-header" onclick="goHome()">
     <h1>POM 知识库</h1>
@@ -620,18 +593,8 @@ function stripHtml(html) {
   return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
 }
 
-/* U3 2026-08-24：搜索索引重建 debounce，避免短时间内多次全量重建 */
-var _bsiTimer = null;
-function debouncedBuildSearchIndex(appendOnly) {
-  if (_bsiTimer) clearTimeout(_bsiTimer);
-  var mode = !!appendOnly;
-  _bsiTimer = setTimeout(function() { buildSearchIndex(mode); _bsiTimer = null; }, 200);
-}
-
-/* U3 2026-08-24：支持 appendOnly 增量模式——客户数据加载后只刷新客户条目，不重建全量索引 */
-function buildSearchIndex(appendOnly) {
-  if (!appendOnly) { searchDocs = []; }
-  else { searchDocs = searchDocs.filter(function(d) { return !d.isCustomer; }); } // 增量：先剔旧客户条目
+function buildSearchIndex() {
+  searchDocs = [];
   if (!kbData || !kbData.categories) return;
   for (var catKey in kbData.categories) {
     var cat = kbData.categories[catKey];
@@ -645,29 +608,13 @@ function buildSearchIndex(appendOnly) {
         subfolder: subfolder || '', text: text
       });
     }
-    if (!appendOnly) {
-      (cat.files || []).forEach(function(f) { addDoc(f, ''); });
-      (cat.subfolders || []).forEach(function(sub) {
-        (sub.files || []).forEach(function(f) { addDoc(f, sub.name); });
-        (sub.groups || []).forEach(function(g) {
-          g.files.forEach(function(f) { addDoc(f, sub.name + '/' + g.name); });
-        });
+    (cat.files || []).forEach(function(f) { addDoc(f, ''); });
+    (cat.subfolders || []).forEach(function(sub) {
+      (sub.files || []).forEach(function(f) { addDoc(f, sub.name); });
+      (sub.groups || []).forEach(function(g) {
+        g.files.forEach(function(f) { addDoc(f, sub.name + '/' + g.name); });
       });
-    }
-    /* 增量模式：仅把客户档案记录追加进索引（含姓名/电话/产品等可搜字段） */
-    if (cat._customerRecords && cat._customerRecords.length) {
-      cat._customerRecords.forEach(function(rec, i) {
-        var name = rec.customerName || rec.name || ('客户' + (i + 1));
-        var text = [rec.businessManager, rec.agent, rec.customerType, rec.dealStatus, rec.phone, rec.product]
-          .filter(Boolean).join(' ');
-        if (text.length > 200) text = text.slice(0, 200);
-        searchDocs.push({
-          name: name, filename: '', isCustomer: true,
-          category: catKey, catLabel: cat.label, catIcon: cat.icon,
-          subfolder: '', text: text
-        });
-      });
-    }
+    });
   }
   if (typeof Fuse !== 'undefined') {
     fuseInstance = new Fuse(searchDocs, {
@@ -686,11 +633,9 @@ function buildSearchIndex(appendOnly) {
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
 var API_TOKEN = 'becf56d2932455e955eb5510d96bc29b91795b70538220d2878c21b9d2bb9753';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
-function fcReq(url, init) {  /* 自动注入 Bearer 令牌（S2a 签名整改暂缓：FC 端 CORS 未放行 X-Timestamp/X-Sign，触发 preflight 失败；待 FC 端配套后再启用签名） */
+function fcReq(url, init) {  /* 自动注入 Bearer 令牌，修复公开站缺令牌导致 FC 401 的漂移 */
   init = init || {};
-  init.headers = Object.assign({
-    'Authorization': 'Bearer ' + API_TOKEN
-  }, init.headers || {});
+  init.headers = Object.assign({ 'Authorization': 'Bearer ' + API_TOKEN }, init.headers || {});
   return fetch(url, init);
 }
 
@@ -699,28 +644,18 @@ var PROTECTED_CATS = ['04-客户档案', '05-行情与行业', '06-生产工艺'
 var unlocked = false;           // P0-3 整改：敏感分类默认锁定，需用户输入访问口令解锁
 var accessPassword = '';        // P0-3 整改：访问口令不内置源码，由用户输入（与 build-static.js MASTER 一致）
 
-/* 会话级解锁记忆（S1 整改 2026-08-24）：
-   明文口令 accessPassword 仅保留在 JS 内存，绝不写入 sessionStorage；
-   storage 只存 { u: 解锁标记, t: 口令的 PBKDF2 派生校验值 }，即使被 XSS 读出也拿不到明文口令。
-   关闭浏览器（会话结束）或刷新页面后内存清空，下次访问加密分类需重新输入一次（符合会话级安全预期）。 */
+/* 会话级解锁记忆：首次输对口令后写入 sessionStorage，刷新/切分类/新标签均免重输；
+   关闭浏览器（会话结束）后清空，下次打开浏览器需重新输入一次。 */
 var POM_UNLOCK_KEY = 'pom_kb_unlock_v1';
-var POM_PW_SALT = 'pom-kb-session-salt-v1';
-function pomDeriveToken(pwd) {
-  try { return CryptoJS.PBKDF2(pwd, POM_PW_SALT, { keySize: 128/32, iterations: 1000 }).toString(); }
-  catch (e) { return ''; }
-}
 function pomSaveUnlock() {
-  try {
-    var t = unlocked && accessPassword ? pomDeriveToken(accessPassword) : '';
-    sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, t: t }));
-  } catch (e) {}
+  try { sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, p: accessPassword })); } catch (e) {}
 }
 function pomRestoreUnlock() {
   try {
     var s = sessionStorage.getItem(POM_UNLOCK_KEY);
     if (!s) return;
     var o = JSON.parse(s);
-    if (o && o.u) { unlocked = true; }   // 仅恢复解锁标记；accessPassword 不回写，需解密时重新弹窗
+    if (o && o.u) { unlocked = true; accessPassword = o.p || ''; }
   } catch (e) {}
 }
 pomRestoreUnlock();
@@ -788,7 +723,6 @@ async function siteLockSubmit() {
        使口令随会话存入 sessionStorage，重载后 pomRestoreUnlock 能恢复，加密内容照常解开。 */
     siteUnlocked = true; unlocked = true; accessPassword = pwd; pomDerivedKey = null;
     siteLockSave(); pomSaveUnlock(); siteLockHide();
-    init(); /* B1 修复 2026-08-24：全站门禁解锁后重新触发 init() 跑 fetchKB/renderSidebar，否则首屏永久"加载中"且侧栏空白 */
   } else {
     siteLockSetErr('口令错误，无法访问知识库');
     if (input) input.value = '';
@@ -869,7 +803,7 @@ function isProtected(catKey) {
 async function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
   if (siteUnlocked) { unlocked = true; callback(); return; } // 全站门禁已解锁：分类级直接放行
-  if (unlocked && accessPassword) { callback(); return; }   // S1：内存中仍有口令，直接放行
+  if (unlocked) { callback(); return; }
   // 本地免密：仅当本地 server 注入了 __KB_LOCAL_MASTER__（localhost 访问时）才走此分支；
   // 线上公网域名不注入该变量，自动跳过，仍弹窗输口令。主密钥不落公开前端文件。
   if (window.__KB_LOCAL_MASTER__) {
@@ -880,59 +814,15 @@ async function requireUnlock(catKey, callback) {
       if (lt === 'POM_PROBE_OK') { unlocked = true; accessPassword = window.__KB_LOCAL_MASTER__; pomSaveUnlock(); callback(); return; }
     } catch (e) { /* 注入密钥无效则退回弹窗 */ }
   }
-  // U1 2026-08-24：改用自定义弹窗（#catLock）替代 window.prompt，支持回车提交+密码可见切换
-  catLockPending = callback;
-  catLockShow();
-}
-/* U1 2026-08-24：加密分类自定义弹窗控制 */
-var catLockPending = null;
-function catLockShow() {
-  var ov = document.getElementById('catLock');
-  var inp = document.getElementById('catLockInput');
-  var err = document.getElementById('catLockErr');
-  if (err) { err.textContent = ''; err.classList.remove('show'); }
-  if (inp) {
-    inp.value = ''; inp.classList.remove('error');
-    inp.onkeydown = function(ev) { if (ev && ev.key === 'Enter') { ev.preventDefault(); catLockSubmit(); } };
-  }
-  if (ov) ov.classList.add('show');
-  if (inp) setTimeout(function(){ inp.focus(); }, 50);
-}
-function catLockHide() {
-  var ov = document.getElementById('catLock');
-  if (ov) ov.classList.remove('show');
-}
-function catLockToggleVis() {
-  var inp = document.getElementById('catLockInput');
-  if (inp) inp.type = (inp.type === 'password') ? 'text' : 'password';
-}
-function catLockCancel() {
-  catLockHide();
-  catLockPending = null;
-}
-async function catLockSubmit() {
-  var inp = document.getElementById('catLockInput');
-  var err = document.getElementById('catLockErr');
-  var pwd = inp ? inp.value : '';
-  if (!pwd) { if (err) { err.textContent = '请输入访问口令'; err.classList.add('show'); } if (inp) inp.classList.add('error'); return; }
+  var pwd = window.prompt('该分类为加密内容，请输入访问口令：');
+  if (pwd === null) return;            // 用户取消
   var probe = (kbData && kbData.probe) ? kbData.probe : '';
-  var ok = false;
-  if (!probe) { ok = true; }
-  else {
-    try { ok = (await decryptText(probe, pwd)) === 'POM_PROBE_OK'; }
-    catch (e) { ok = false; }
-  }
-  if (ok) {
-    unlocked = true; accessPassword = pwd; pomSaveUnlock();
-    catLockHide();
-    var cb = catLockPending; catLockPending = null;
-    if (cb) cb();
-  } else {
-    pomDerivedKey = null;
-    if (inp) inp.classList.add('error');
-    if (err) { err.textContent = '口令错误，无法解密该分类。'; err.classList.add('show'); }
-    if (inp) inp.value = '';
-  }
+  if (!probe) { unlocked = true; accessPassword = pwd; pomSaveUnlock(); callback(); return; }
+  var t = '';
+  try { t = await decryptText(probe, pwd); }
+  catch (e) { t = ''; }
+  if (t === 'POM_PROBE_OK') { unlocked = true; accessPassword = pwd; pomSaveUnlock(); callback(); }
+  else { pomDerivedKey = null; window.alert('口令错误，无法解密该分类。'); }
 }
 
 /* ===== 学习工具（已合并至「基础知识」分类页底部） ===== */
@@ -1094,13 +984,13 @@ async function init() {
     var res = await fetchKB('data-index.json');
     kbData = await res.json();
     loadedCats = {};
-    debouncedBuildSearchIndex();
+    buildSearchIndex();
     renderSidebar();
     if (!navigateFromHash()) showWelcome();
-    /* 客户档案异步加载（jsDelivr 国内偶发慢），不阻塞首屏；返回后增量追加客户条目到索引 */
+    /* 客户档案异步加载（jsDelivr 国内偶发慢），不阻塞首屏；返回后合并并刷新 */
     loadCustomers().then(function() {
       mergeCustomers();
-      debouncedBuildSearchIndex(true);
+      buildSearchIndex();
       renderSidebar();
     }).catch(function() {});
   } catch (e) {
@@ -1115,7 +1005,7 @@ async function refreshData() {
     loadedCats = {};
     await loadCustomers();
     mergeCustomers();
-    debouncedBuildSearchIndex();
+    buildSearchIndex();
     renderSidebar();
     showToast('数据已刷新 (' + new Date(kbData.buildTime).toLocaleString('zh-CN') + ')');
   } catch (e) { showToast('刷新失败'); }
@@ -2100,14 +1990,8 @@ function showCustomerTable() {
   document.getElementById('contentWrap').scrollTop = 0;
 }
 
-async function exportCustomersXLSX() {
-  /* 2026-08-24 性能优化：xlsx.full.min.js 881KB 改按需懒加载，首屏不再 defer 阻塞 */
-  if (typeof XLSX === 'undefined') {
-    showToast('正在加载导出组件，请稍候...');
-    try { await loadScript('lib/xlsx.full.min.js'); }
-    catch (e) { showToast('导出组件加载失败，请检查网络后重试'); return; }
-    if (typeof XLSX === 'undefined') { showToast('导出组件加载异常'); return; }
-  }
+function exportCustomersXLSX() {
+  if (typeof XLSX === 'undefined') { showToast('导出组件未加载，请刷新页面后重试'); return; }
   var cat = (kbData && kbData.categories) ? kbData.categories['04-客户档案'] : null;
   var records = (cat && cat._customerRecords) ? cat._customerRecords : [];
   if (!records.length) { showToast('暂无客户档案可导出'); return; }
@@ -2898,13 +2782,6 @@ function showToast(msg) {
   el.classList.add('show');
   setTimeout(function() { el.classList.remove('show'); }, 2500);
 }
-/* Q1 2026-08-24：统一错误处理，替代散落的 window.alert；severity: 'info'|'warn'|'error' */
-function handleError(context, err, severity) {
-  var msg = (context ? context + '：' : '') + (err && err.message ? err.message : (typeof err === 'string' ? err : '未知错误'));
-  if (severity === 'error') { console.error('[POM]', context, err); showToast(msg); }
-  else if (severity === 'warn') { console.warn('[POM]', context, err); }
-  else { console.log('[POM]', context, err); }
-}
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -2999,8 +2876,7 @@ function loadStats(days, realtime) {
       document.getElementById('statsData').style.display = 'block';
       if (rtBtn) { rtBtn.disabled = false; rtBtn.textContent = '🔄 拉取实时数据'; }
       var tip = useRealtime ? '实时接口请求失败，请稍后重试，或直接切换时间范围按钮走 CDN 模式' : '已尝试经 jsDelivr CDN 读取，请检查网络后重试';
-      var errMsg = escapeHtml(e.message || '网络错误');
-      document.getElementById('statsData').innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：${errMsg}<br><span style="font-size:12px;opacity:.7">${escapeHtml(tip)}</span></div>`;
+      document.getElementById('statsData').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">加载统计失败：' + escapeHtml(e.message || '网络错误') + '<br><span style="font-size:12px;opacity:.7">' + tip + '</span></div>';
     });
 }
 
@@ -3140,7 +3016,7 @@ function renderStatsData(results, days) {
 }
 
 function exportStatsCSV() {
-  if (!currentStatsResults.length) { handleError('暂无数据可导出', null, 'info'); return; }
+  if (!currentStatsResults.length) { alert('暂无数据可导出'); return; }
   var rows = [['日期','时间','设备','系统','浏览器','屏幕','来源']];
   currentStatsResults.forEach(function(r){
     r.visits.forEach(function(v){
@@ -3160,20 +3036,8 @@ setTimeout(trackVisit, 2000);
 if (location.search.indexOf('stats') >= 0) { openStats(); }
 
 /* ===== Service Worker 缓存 ===== */
-/* SW 自愈（2026-08-24 紧急修复）：若浏览器已注册的 SW 版本与当前页面内置版本不一致，
-   说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
-   主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202608242231';
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    regs.forEach(function(r) {
-      var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
-      if (url && KB_SW_VERSION && url.indexOf(KB_SW_VERSION) < 0) {
-        r.unregister().then(function() { location.reload(); });
-      }
-    });
-  }).catch(function() {});
-  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function() {});
+  navigator.serviceWorker.register('sw.js').catch(function() {});
 }
 </script>
 <!-- 网页截图依赖 html2canvas：改为点击截图按钮时按需懒加载，避免首屏下载 198KB -->
@@ -3196,7 +3060,7 @@ if ('serviceWorker' in navigator) {
     window.scrollTo(0,0);
     if (typeof html2canvas === 'undefined') {
       try { await loadScript('html2canvas.min.js'); }
-      catch (e) { handleError('截图组件加载失败', e, 'error'); b.style.display='';b.innerHTML=o;b.style.opacity='';b.dataset.busy='0'; return; }
+      catch (e) { alert('截图组件加载失败'); b.style.display='';b.innerHTML=o;b.style.opacity='';b.dataset.busy='0'; return; }
     }
     var fix=document.createElement('style');fix.id='pom-shot-fix';fix.textContent='*{-webkit-background-clip:border-box!important;-webkit-text-fill-color:initial!important}';document.head.appendChild(fix);
     setTimeout(function(){
@@ -3211,7 +3075,7 @@ if ('serviceWorker' in navigator) {
       }).catch(function(e){
         saved.forEach(function(s){s.el.style.overflow=s.ov;s.el.style.height=s.h;s.el.style.maxHeight=s.mh});
         document.head.removeChild(fix);
-        handleError('截图失败', e, 'error');
+        alert('截图失败：'+e.message);
       }).then(function(){
         b.style.display='';b.innerHTML=o;b.style.opacity='';b.dataset.busy='0';
       });
