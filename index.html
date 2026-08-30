@@ -519,7 +519,7 @@ body {
   </div>
 </div>
 <div class="sidebar">
-  <div class="sidebar-header" onclick="goHome()">
+  <div class="sidebar-header" onclick="hardReload()" title="强刷：清缓存并重新加载当前页">
     <h1>POM 知识库</h1>
     <div class="sub">聚甲醛业务知识库</div>
   </div>
@@ -1329,6 +1329,22 @@ function generateCustomerMd(rec) {
     }
   }
   return md;
+}
+
+/* ===== 强刷（点左上角 POM 知识库）：注销所有 SW + 绕过 HTTP 缓存重载当前页 ===== */
+function hardReload() {
+  function doReload() {
+    /* 去掉上次可能残留的 _hr 时间戳，再追加新时间戳，保证每次 URL 不同、绕过 HTTP/CDN 缓存 */
+    var href = window.location.href.replace(/[?&]_hr=\d+/, '');
+    var sep = href.indexOf('?') >= 0 ? '&' : '?';
+    window.location.replace(href + sep + '_hr=' + Date.now());
+  }
+  if ('serviceWorker' in navigator) {
+    /* 先注销所有已注册 SW（清掉旧缓存），再强制重载，等价于 Ctrl+F5 + 手动 Unregister */
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      return Promise.all(regs.map(function(r) { return r.unregister(); }));
+    }).catch(function() {}).then(doReload);
+  } else { doReload(); }
 }
 
 /* ===== 返回首页 ===== */
@@ -3168,7 +3184,7 @@ if (location.search.indexOf('stats') >= 0) { openStats(); }
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202608302331';
+  var KB_SW_VERSION = 'pom-kb-202608302346';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
