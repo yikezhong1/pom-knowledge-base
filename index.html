@@ -519,7 +519,7 @@ body {
   </div>
 </div>
 <div class="sidebar">
-  <div class="sidebar-header" onclick="goHome()">
+  <div class="sidebar-header" onclick="hardReload()" title="强刷：清缓存并重新加载当前页">
     <h1>POM 知识库</h1>
     <div class="sub">聚甲醛业务知识库</div>
   </div>
@@ -712,7 +712,7 @@ function pomDeriveToken(pwd) {
 function pomSaveUnlock() {
   try {
     var t = unlocked && accessPassword ? pomDeriveToken(accessPassword) : '';
-    sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, t: t }));
+    sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, t: t, p: accessPassword || '' }));
   } catch (e) {}
 }
 function pomRestoreUnlock() {
@@ -720,7 +720,7 @@ function pomRestoreUnlock() {
     var s = sessionStorage.getItem(POM_UNLOCK_KEY);
     if (!s) return;
     var o = JSON.parse(s);
-    if (o && o.u) { unlocked = true; }   // 仅恢复解锁标记；accessPassword 不回写，需解密时重新弹窗
+    if (o && o.u) { unlocked = true; if (o.p) accessPassword = o.p; }   // 恢复解锁标记并回写口令（sessionStorage 会话级，刷新后免重输解密）
   } catch (e) {}
 }
 pomRestoreUnlock();
@@ -868,7 +868,7 @@ function isProtected(catKey) {
 
 async function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
-  if (siteUnlocked) { unlocked = true; callback(); return; } // 全站门禁已解锁：分类级直接放行
+  if (siteUnlocked) { if (!accessPassword && window.__KB_LOCAL_MASTER__) accessPassword = window.__KB_LOCAL_MASTER__; unlocked = true; callback(); return; } // 全站门禁已解锁：分类级直接放行（本地免密兜底补 accessPassword）
   if (unlocked && accessPassword) { callback(); return; }   // S1：内存中仍有口令，直接放行
   // 本地免密：仅当本地 server 注入了 __KB_LOCAL_MASTER__（localhost 访问时）才走此分支；
   // 线上公网域名不注入该变量，自动跳过，仍弹窗输口令。主密钥不落公开前端文件。
@@ -1027,7 +1027,7 @@ window.addEventListener('hashchange', function() {
 var KB_CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/';
 async function fetchKB(name, timeout) {
   timeout = timeout || 8000;
-  var sources = [KB_CDN + name, name]; // jsDelivr 优先，同域 github.io 兜底
+  var sources = [name, KB_CDN + name]; // 同域（本地或 github.io）优先，jsDelivr 兜底
   var lastErr;
   for (var i = 0; i < sources.length; i++) {
     var ctrl = new AbortController();
@@ -1331,6 +1331,22 @@ function generateCustomerMd(rec) {
   return md;
 }
 
+/* ===== 强刷（点左上角 POM 知识库）：注销所有 SW + 绕过 HTTP 缓存重载当前页 ===== */
+function hardReload() {
+  function doReload() {
+    /* 去掉上次可能残留的 _hr 时间戳，再追加新时间戳，保证每次 URL 不同、绕过 HTTP/CDN 缓存 */
+    var href = window.location.href.replace(/[?&]_hr=\d+/, '');
+    var sep = href.indexOf('?') >= 0 ? '&' : '?';
+    window.location.replace(href + sep + '_hr=' + Date.now());
+  }
+  if ('serviceWorker' in navigator) {
+    /* 先注销所有已注册 SW（清掉旧缓存），再强制重载，等价于 Ctrl+F5 + 手动 Unregister */
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      return Promise.all(regs.map(function(r) { return r.unregister(); }));
+    }).catch(function() {}).then(doReload);
+  } else { doReload(); }
+}
+
 /* ===== 返回首页 ===== */
 async function goHome() {
   openCats.clear();
@@ -1592,7 +1608,8 @@ async function openFile(category, filename, subfolder) {
      openFile 这里若再 encode 一次会变成双重编码，使 location.hash 每次重写都再编码，
      触发无限 hashchange 循环（子目录文件点开"跳回/没了"）。统一：先 decode 还原再单次 encode，
      保证从 onclick(已编码) 或 navigateFromHash(已解码) 进入都得到稳定且一致的 hash。 */
-  var subfolderForHash = subfolder ? decodeURIComponent(subfolder) : '';
+  /* subfolder 已在函数入口解码为原始值，这里直接复用，避免冗余 decodeURIComponent 再引入编码问题 */
+  var subfolderForHash = subfolder || '';
   var hashPath = '#/' + encodeURIComponent(category) + '/' + (subfolderForHash ? encodeURIComponent(subfolderForHash) + '/' : '') + encodeURIComponent(filename);
   if (location.hash !== hashPath) location.hash = hashPath;
   renderSidebar(document.getElementById('searchInput').value.trim());
@@ -1605,7 +1622,7 @@ async function openFile(category, filename, subfolder) {
     return;
   }
   var breadPath = catMeta.icon + ' ' + catMeta.label;
-  if (subfolder) breadPath += ' / ' + decodeURIComponent(subfolder).replace(/\//g, ' / ');
+  if (subfolder) breadPath += ' / ' + subfolder.replace(/\//g, ' / ');
   breadPath += ' / <span>' + file.name + '</span>';
   document.getElementById('breadcrumb').innerHTML = breadPath;
   var actions = document.getElementById('topbarActions');
@@ -1624,7 +1641,7 @@ async function openFile(category, filename, subfolder) {
   actions.innerHTML = '<button onclick="copyContent()">复制内容</button>';
   var modDate = new Date(file.modified).toLocaleString('zh-CN');
   var sizeKB = (file.size / 1024).toFixed(1);
-  var subLabel = subfolder ? ' / ' + decodeURIComponent(subfolder) : '';
+  var subLabel = subfolder ? ' / ' + subfolder : '';
   var htmlToRender = file.html;
   if (file.encrypted) {
     try { htmlToRender = await decryptText(file.html, accessPassword); }
@@ -3167,7 +3184,7 @@ if (location.search.indexOf('stats') >= 0) { openStats(); }
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202608301701';
+  var KB_SW_VERSION = 'pom-kb-202608310143';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
@@ -3176,7 +3193,7 @@ if ('serviceWorker' in navigator) {
       }
     });
   }).catch(function() {});
-  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function() {});
+  navigator.serviceWorker.register('sw.js?v=' + KB_SW_VERSION, { updateViaCache: 'none' }).catch(function() {});
 }
 </script>
 <!-- 网页截图依赖 html2canvas：改为点击截图按钮时按需懒加载，避免首屏下载 198KB -->
