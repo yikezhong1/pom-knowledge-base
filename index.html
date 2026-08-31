@@ -215,6 +215,13 @@ body {
 .cp-file-card .cp-ext { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--accent-light); color: var(--accent); text-transform: uppercase; font-weight: 600; }
 .cp-file-card .cp-ext.pdf { background: rgba(239,68,68,.1); color: #ef4444; }
 .cp-file-card .cp-ext.link { background: rgba(34,197,94,.1); color: #16a34a; }
+/* 资源中心导航与视图 */
+.nav-resource { display: flex; align-items: center; gap: 8px; margin: 10px 12px 4px; padding: 10px 14px; background: var(--bg-sidebar-active); color: #fff; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.nav-resource:hover { background: var(--accent); }
+.res-card { text-decoration: none; color: inherit; }
+.res-note { font-size: 13px; color: var(--text-secondary); margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); line-height: 1.6; }
+.res-size { font-size: 11px; color: var(--text-secondary); margin-left: auto; flex-shrink: 0; }
+.res-loc { font-size: 11px; color: var(--text-secondary); width: 100%; margin-top: 2px; }
 .cp-action-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
   background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
@@ -526,6 +533,7 @@ body {
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="搜索文件..." oninput="onSearch(this.value)">
   </div>
+  <div class="nav-resource" onclick="location.hash='#/resources'" title="查看知识库内登记的附件资源（视频/PDF/图片/文档等）">📎 资源中心</div>
   <div class="file-list" id="fileList"></div>
 </div>
 <div class="sidebar-mask" id="sidebarMask" onclick="toggleSidebar()"></div>
@@ -546,6 +554,7 @@ body {
     <div class="pw-icon">🗑️</div>
     <h3>删除客户档案</h3>
     <div class="pw-desc">确定要删除客户「<span id="delCustomerName" style="color:var(--text-primary);font-weight:600"></span>」的档案吗？</div>
+    <div class="write-key-modal-wrap"><label style="font-size:13px;color:var(--text-secondary)">客户写口令<span style="color:#ef4444">*</span></label><input type="password" id="writeKeyInputDel" class="writeKeyInput" placeholder="请输入客户写口令（WRITE_KEY）" style="width:100%;margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary)"></div>
     <div class="pw-btns">
       <button class="pw-cancel" onclick="closeDeleteModal()">取消</button>
       <button class="pw-confirm" id="delConfirmBtn" style="background:#ef4444" onclick="executeDeleteCustomer()">确认删除</button>
@@ -685,13 +694,25 @@ function buildSearchIndex(appendOnly) {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var API_TOKEN = '{{KB_API_TOKEN}}';  /* 由 build-static.js 构建时从本地 kb-secrets.local.js 注入，源码不硬编码 */
-function fcReq(url, init) {  /* 自动注入 Bearer 令牌（S2a 签名整改暂缓：FC 端 CORS 未放行 X-Timestamp/X-Sign，触发 preflight 失败；待 FC 端配套后再启用签名） */
+var READ_TOKEN = '93b2418fdfbc9b8e10f5e47a7491350ddc46396dca1ba40608ba5aca5cbb3a61';   /* 只读令牌：GET /customers /stats /geocode 鉴权，构建时注入（只读权限，随公网发布可接受） */
+var STATS_TOKEN = 'e591bf8747827d412b99c1fc52c78b326aa9ca655bd45e20b43e5cb315e5a84c'; /* 埋点写令牌：POST /stats 鉴权，构建时注入 */
+/* WRITE_KEY（客户写口令）不注入前端：教授每次提交时手输，会话级不持久化，杜绝公网泄露 */
+function fcReq(url, init, token) {  /* token 缺省用 READ_TOKEN（只读 GET）；写操作显式传入 STATS_TOKEN / WRITE_KEY */
   init = init || {};
+  var tk = token || READ_TOKEN;
   init.headers = Object.assign({
-    'Authorization': 'Bearer ' + API_TOKEN
+    'Authorization': 'Bearer ' + tk
   }, init.headers || {});
   return fetch(url, init);
+}
+/* 取客户写口令（教授手输，不持久化；add/edit/删除弹窗三处共用 class writeKeyInput，返回首个非空值） */
+function getWriteKey() {
+  var els = document.querySelectorAll('.writeKeyInput');
+  for (var i = 0; i < els.length; i++) {
+    var v = (els[i].value || '').trim();
+    if (v) return v;
+  }
+  return '';
 }
 
 /* ===== 密码保护（已取消在线密码；内容构建时加密、前端用内置密钥自动解密，用户无感访问） ===== */
@@ -712,7 +733,7 @@ function pomDeriveToken(pwd) {
 function pomSaveUnlock() {
   try {
     var t = unlocked && accessPassword ? pomDeriveToken(accessPassword) : '';
-    sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, t: t }));
+    sessionStorage.setItem(POM_UNLOCK_KEY, JSON.stringify({ u: unlocked, t: t, p: accessPassword || '' }));
   } catch (e) {}
 }
 function pomRestoreUnlock() {
@@ -720,7 +741,7 @@ function pomRestoreUnlock() {
     var s = sessionStorage.getItem(POM_UNLOCK_KEY);
     if (!s) return;
     var o = JSON.parse(s);
-    if (o && o.u) { unlocked = true; }   // 仅恢复解锁标记；accessPassword 不回写，需解密时重新弹窗
+    if (o && o.u) { unlocked = true; if (o.p) accessPassword = o.p; }   // 恢复解锁标记并回写口令（sessionStorage 会话级，刷新后免重输解密）
   } catch (e) {}
 }
 pomRestoreUnlock();
@@ -868,7 +889,7 @@ function isProtected(catKey) {
 
 async function requireUnlock(catKey, callback) {
   if (!isProtected(catKey)) { callback(); return; }
-  if (siteUnlocked) { unlocked = true; callback(); return; } // 全站门禁已解锁：分类级直接放行
+  if (siteUnlocked) { if (!accessPassword && window.__KB_LOCAL_MASTER__) accessPassword = window.__KB_LOCAL_MASTER__; unlocked = true; callback(); return; } // 全站门禁已解锁：分类级直接放行（本地免密兜底补 accessPassword）
   if (unlocked && accessPassword) { callback(); return; }   // S1：内存中仍有口令，直接放行
   // 本地免密：仅当本地 server 注入了 __KB_LOCAL_MASTER__（localhost 访问时）才走此分支；
   // 线上公网域名不注入该变量，自动跳过，仍弹窗输口令。主密钥不落公开前端文件。
@@ -1015,6 +1036,7 @@ function navigateFromHash() {
   return true;
 }
 window.addEventListener('hashchange', function() {
+  if (location.hash === '#/resources') { showResources(); return; }
   if (!navigateFromHash()) {
     /* 哈希被清空或无效时回到首页 */
     if (!location.hash || location.hash === '#' || location.hash === '#/') showWelcome();
@@ -1027,7 +1049,7 @@ window.addEventListener('hashchange', function() {
 var KB_CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/';
 async function fetchKB(name, timeout) {
   timeout = timeout || 8000;
-  var sources = [KB_CDN + name, name]; // jsDelivr 优先，同域 github.io 兜底
+  var sources = [name, KB_CDN + name]; // 同域（本地或 github.io）优先，jsDelivr 兜底
   var lastErr;
   for (var i = 0; i < sources.length; i++) {
     var ctrl = new AbortController();
@@ -1096,7 +1118,8 @@ async function init() {
     loadedCats = {};
     debouncedBuildSearchIndex();
     renderSidebar();
-    if (!navigateFromHash()) showWelcome();
+    if (location.hash === '#/resources') { showResources(); }
+    else if (!navigateFromHash()) showWelcome();
     /* 客户档案异步加载（jsDelivr 国内偶发慢），不阻塞首屏；返回后增量追加客户条目到索引 */
     loadCustomers().then(function() {
       mergeCustomers();
@@ -1699,6 +1722,8 @@ function showCustomerForm() {
     }
     html += '</div></div>';
   }
+  html += '<div class="form-row full"><div class="form-field"><label>客户写口令<span class="req">*</span></label><input type="password" id="writeKeyInput" class="writeKeyInput" placeholder="请输入客户写口令（WRITE_KEY），提交时校验，不保存本机"></div></div>';
+  html += '<div class="loc-map-tip" style="margin:6px 0 0">🔐 写口令由教授掌握，仅用于新增/修改/删除客户，不会存储到本机或公网。</div>';
   html += '<div class="form-actions"><button class="form-submit" id="formSubmitBtn" onclick="submitCustomerForm()">提交客户档案</button><button class="form-reset" onclick="resetCustomerForm()">清空重填</button></div>';
   html += '<div class="form-note">提示：带 <span style="color:#ef4444">*</span> 的为必填项。提交后数据将保存到 GitHub 仓库的 customers.json 文件中，刷新页面即可在「现有客户档案」中查看。</div>';
   html += '</div>';
@@ -1824,48 +1849,33 @@ function getLocation() {
   }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
-/* ===== 高德逆地理编码配置 =====
-   需要「Web服务」类型的 key（免费申请：https://console.amap.com → 应用管理 → 创建应用 → 添加 key，服务平台选「Web服务」）。
-   申请到后，把下面双引号里的 YOUR_AMAP_WEB_KEY 替换成你的 key 即可。
-   说明：高德 Web 服务 key 无法按域名限流（它只校验 key 本身），建议在高德控制台把该 key 的「日调用量」调低，
-   或后续改用带后端代理的方式，避免被他人盗刷额度。 */
-var AMAP_WEB_KEY = "cb37e403502c4c90dd134bf643932f78";
-
-/* 逆地理编码：坐标 → 省市区县（高德 Web 服务，国内精准、稳定） */
+/* ===== 逆地理编码（走 FC /api/geocode 代理，高德 key 仅存 FC 后端，不下发前端）=====
+   整改（2026-08-31，A10）：原前端直连 restapi.amap.com 带明文 Web 服务 key（随公网发布，可被盗刷）
+   → 改为请求自建 FC 代理，FC 用环境变量 AMAP_WEB_KEY 调高德，前端零 key。
+   GET 需 READ_TOKEN 鉴权（前端注入值即 READ_TOKEN）。FC 未上线时自动降级为手填。 */
 function reverseGeocode(lat, lng) {
   return new Promise(function(resolve, reject) {
-    if (!AMAP_WEB_KEY || AMAP_WEB_KEY === "YOUR_AMAP_WEB_KEY") {
-      reject(new Error("未配置高德 key，请在源码中填入 AMAP_WEB_KEY"));
-      return;
-    }
-    var xhr = new XMLHttpRequest();
-    /* 高德 location 参数为「经度,纬度」，与 lat/lng 参数顺序相反，注意转换 */
-    xhr.open("GET", "https://restapi.amap.com/v3/geocode/regeo?location=" + lng + "," + lat + "&key=" + AMAP_WEB_KEY + "&radius=1000&extensions=base&output=json", true);
-    xhr.timeout = 8000;
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        try {
-          var data = JSON.parse(xhr.responseText);
-          if (data.status !== "1") { reject(new Error(data.info || "高德返回错误")); return; }
-          var comp = (data.regeocode && data.regeocode.addressComponent) || {};
-          var province = comp.province || "";
-          var city = comp.city || "";
-          if (city === province) city = "";
-          var district = comp.district || "";
-          var township = comp.township || "";
-          var shortProv = province.replace(/省|市|壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区/g, "");
-          var shortCity = city.replace(/市|自治州|地区|盟/g, "");
-          var marketRegion = shortProv ? (shortCity ? shortProv + "/" + shortCity : shortProv) : shortCity;
-          var fullAddress = (data.regeocode && data.regeocode.formatted_address) || (province + city + district + township);
-          resolve({ marketRegion: marketRegion, fullAddress: fullAddress, province: shortProv, city: shortCity, district: district, township: township });
-        } catch(e) { reject(e); }
-      } else {
-        reject(new Error("地址解析失败"));
-      }
-    };
-    xhr.onerror = function() { reject(new Error("网络错误")); };
-    xhr.ontimeout = function() { reject(new Error("超时")); };
-    xhr.send();
+    var url = WORKER_URL + '/geocode?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
+    fcReq(url, {})  /* 自动带 READ_TOKEN；FC 未上线时 reject，由调用方降级处理 */
+      .then(function(r) {
+        if (!r.ok) throw new Error('地址解析失败');
+        return r.json();
+      })
+      .then(function(data) {
+        if (data.status !== "1") { reject(new Error(data.info || "高德返回错误")); return; }
+        var comp = (data.regeocode && data.regeocode.addressComponent) || {};
+        var province = comp.province || "";
+        var city = comp.city || "";
+        if (city === province) city = "";
+        var district = comp.district || "";
+        var township = comp.township || "";
+        var shortProv = province.replace(/省|市|壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区/g, "");
+        var shortCity = city.replace(/市|自治州|地区|盟/g, "");
+        var marketRegion = shortProv ? (shortCity ? shortProv + "/" + shortCity : shortProv) : shortCity;
+        var fullAddress = (data.regeocode && data.regeocode.formatted_address) || (province + city + district + township);
+        resolve({ marketRegion: marketRegion, fullAddress: fullAddress, province: shortProv, city: shortCity, district: district, township: township });
+      })
+      .catch(function(e) { reject(e); });
   });
 }
 
@@ -2056,7 +2066,7 @@ async function submitCustomerForm() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add', record: record })
-    });
+    }, getWriteKey());
     if (!res.ok) { var err = await res.json(); throw new Error(err.error || '提交失败'); }
     var result = await res.json();
     /* 更新本地数据 */
@@ -2450,7 +2460,7 @@ async function executeDeleteCustomer() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', index: rawIndex })
-    });
+    }, getWriteKey());
     if (!res.ok) { var err = await res.json(); throw new Error(err.error || '删除失败'); }
     var result = await res.json();
     customersData = { records: result.records || [] };
@@ -2528,6 +2538,8 @@ function showCustomerEditForm(index) {
     }
     html += '</div></div>';
   }
+  html += '<div class="form-row full"><div class="form-field"><label>客户写口令<span class="req">*</span></label><input type="password" id="writeKeyInput" class="writeKeyInput" placeholder="请输入客户写口令（WRITE_KEY），保存时校验，不保存本机"></div></div>';
+  html += '<div class="loc-map-tip" style="margin:6px 0 0">🔐 写口令由教授掌握，仅用于新增/修改/删除客户，不会存储到本机或公网。</div>';
   html += '<div class="form-actions"><button class="form-submit" id="formSubmitBtn" onclick="saveCustomerEdit()">保存修改</button><button class="form-reset" onclick="showCustomerTable()">取消返回</button></div>';
   html += '<div class="form-note">提示：带 <span style="color:#ef4444">*</span> 的为必填项。保存后数据将更新到 GitHub 仓库的 customers.json 文件中。</div>';
   html += '</div>';
@@ -2598,7 +2610,7 @@ async function saveCustomerEdit() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update', index: rawIndex, record: rec })
-    });
+    }, getWriteKey());
     if (!res.ok) { var err = await res.json(); throw new Error(err.error || '保存失败'); }
     var result = await res.json();
     customersData = { records: result.records || [] };
@@ -2668,6 +2680,56 @@ function showWelcome() {
     + '<div class="kb-footer">版权所有 2026 · 新疆心连心 / 心瑞 · 共聚甲醛销售知识库</div>'
     + '</div>';
   document.getElementById('contentWrap').innerHTML = html;
+}
+
+/* ===== 资源中心（附件资源浏览，消费 resources.json） ===== */
+async function showResources() {
+  destroyMap();
+  currentFile = null;
+  renderSidebar();
+  document.getElementById('breadcrumb').innerHTML = '📎 <span>资源中心</span>';
+  document.getElementById('topbarActions').innerHTML = '';
+  var wrap = document.getElementById('contentWrap');
+  wrap.innerHTML = '<div class="loading">加载资源清单中...</div>';
+  var res;
+  try {
+    var r = await fetchKB('resources.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    res = await r.json();
+  } catch (e) {
+    wrap.innerHTML = '<div class="pdf-notice"><div class="icon">⚠️</div><p>资源清单加载失败：' + (e.message || e) + '</p></div>';
+    return;
+  }
+  if (!res || !res.length) {
+    wrap.innerHTML = '<div class="pdf-notice"><div class="icon">📎</div><p>暂无登记资源</p></div>';
+    return;
+  }
+  function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  // 按分类分组
+  var groups = {};
+  res.forEach(function(it) { (groups[it.category] = groups[it.category] || []).push(it); });
+  var html = '<div class="category-page"><div class="cp-header"><div class="cp-icon">📎</div><div><div class="cp-title">资源中心</div><div class="cp-count">' + res.length + ' 个附件资源</div></div></div>';
+  html += '<div class="res-note">以下为知识库内登记的附件资源（视频 / PDF / 图片 / 文档等），按所属分类排列。点击任意条目可在新窗口打开或下载；资源本身仍随知识库正常发布，被 md 正文引用时也可在文中直接点开。</div>';
+  Object.keys(groups).forEach(function(catKey) {
+    var meta = (kbData && kbData.categories && kbData.categories[catKey]) || { icon: '📁', label: catKey };
+    var items = groups[catKey];
+    html += '<div class="cp-sub-title">' + meta.icon + ' ' + meta.label + '（' + items.length + '）</div><div class="cp-file-grid">';
+    items.forEach(function(it) {
+      var sizeKB = it.size / 1024;
+      var sizeStr = sizeKB >= 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : Math.round(sizeKB) + ' KB';
+      html += '<a class="cp-file-card res-card" href="' + it.relPath + '" target="_blank" rel="noopener">'
+        + '<span class="cp-dot"></span>'
+        + '<span class="cp-name">' + esc(it.filename) + '</span>'
+        + '<span class="cp-ext ' + it.ext + '">' + it.ext + '</span>'
+        + '<span class="res-size">' + sizeStr + '</span>'
+        + (it.subfolder ? '<span class="res-loc">📂 ' + esc(it.subfolder) + '</span>' : '')
+        + '</a>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+  if (window.innerWidth <= 768) closeSidebar();
 }
 
 /* ===== 搜索（站内/站外） ===== */
@@ -2966,7 +3028,7 @@ function saveVisit(visit) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ visit: visit })
-  }).catch(function(e) { console.log('stats save error:', e); });
+  }, STATS_TOKEN).catch(function(e) { console.log('stats save error:', e); });
 }
 
 /* 2026-08-01 整改：fetchVisitIp() 已整体删除
@@ -3184,7 +3246,7 @@ if (location.search.indexOf('stats') >= 0) { openStats(); }
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202608311610';
+  var KB_SW_VERSION = 'pom-kb-202609010013';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
