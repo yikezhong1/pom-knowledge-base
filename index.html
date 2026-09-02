@@ -694,8 +694,8 @@ function buildSearchIndex(appendOnly) {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var READ_TOKEN = '93b2418fdfbc9b8e10f5e47a7491350ddc46396dca1ba40608ba5aca5cbb3a61';   /* 只读令牌：GET /customers /stats /geocode 鉴权，构建时注入（只读权限，随公网发布可接受） */
-var STATS_TOKEN = 'e591bf8747827d412b99c1fc52c78b326aa9ca655bd45e20b43e5cb315e5a84c'; /* 埋点写令牌：POST /stats 鉴权，构建时注入 */
+var READ_TOKEN = '{{KB_READ_TOKEN}}';   /* 只读令牌：GET /customers /stats /geocode 鉴权，构建时注入（只读权限，随公网发布可接受） */
+var STATS_TOKEN = '{{KB_STATS_TOKEN}}'; /* 埋点写令牌：POST /stats 鉴权，构建时注入 */
 /* WRITE_KEY（客户写口令）不注入前端：教授每次提交时手输，会话级不持久化，杜绝公网泄露 */
 function fcReq(url, init, token) {  /* token 缺省用 READ_TOKEN（只读 GET）；写操作显式传入 STATS_TOKEN / WRITE_KEY */
   init = init || {};
@@ -963,6 +963,12 @@ var LEARNING_TOOLS = [
   { name: '7月份应用知识专项测试（60题）', url: 'https://yikezhong1.github.io/pom-training/quiz-202607.html', icon: '🧪', desc: '依据《7月份POM基础应用知识测试材料》出题：缩水凹陷调机、保压补缩、料温模温、冷却排气、国产料热稳定红线，含 12 道现场情景题' }
 ];
 
+function openExt(url) {
+  // 线下模式点击外链培训页时提示需联网（链接仍打开）
+  if (shouldShowSyncButton()) showToast('该培训页需联网打开');
+  window.open(url, '_blank');
+}
+
 /* ===== 在线填报表单定义 ===== */
 var FORM_SECTIONS = [
   { title: '基本信息', icon: '📋', fields: [
@@ -1049,7 +1055,9 @@ window.addEventListener('hashchange', function() {
 var KB_CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/';
 async function fetchKB(name, timeout) {
   timeout = timeout || 8000;
-  var sources = [name, KB_CDN + name]; // 同域（本地或 github.io）优先，jsDelivr 兜底
+  // 线下模式（localhost/127.0.0.1/file）：只读本地，不回退 jsDelivr 线上源
+  var offline = shouldShowSyncButton();
+  var sources = offline ? [name] : [name, KB_CDN + name];
   var lastErr;
   for (var i = 0; i < sources.length; i++) {
     var ctrl = new AbortController();
@@ -1065,7 +1073,7 @@ async function fetchKB(name, timeout) {
       console.warn('[fetchKB] 失败:', sources[i], (e && e.message) || e);
     }
   }
-  throw new Error('所有数据源加载失败: ' + name + (lastErr ? ' (' + (lastErr.message || lastErr) + ')' : ''));
+  throw new Error((offline ? '本地文件缺失或读取失败: ' : '所有数据源加载失败: ') + name + (lastErr ? ' (' + (lastErr.message || lastErr) + ')' : '') + (offline ? '（请确认已构建 dist，或重跑 build-static.js）' : ''));
 }
 
 async function ensureCategory(catKey) {
@@ -1092,7 +1100,8 @@ async function ensureCategory(catKey) {
 /* 判断当前是否为线下环境（本地服务 / 本地文件），只有线下才显示「同步线上内容」按钮 */
 function shouldShowSyncButton() {
   var h = location.hostname.toLowerCase();
-  if (h === 'localhost' || h === '127.0.0.1' || location.protocol === 'file:') return true;
+  // 同时作为「线下模式」判定：localhost/127.0.0.1/::1 本地服务 或 file:// 直接打开 = 线下（不读线上知识库内容）
+  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || location.protocol === 'file:') return true;
   return false;
 }
 
@@ -1146,6 +1155,15 @@ async function refreshData() {
 
 /* ===== customers.json 加载与合并 ===== */
 async function loadCustomers() {
+  // 线下模式（localhost/127.0.0.1/file）：只读本地 customers.json 快照，不主动读线上 FC/CDN
+  if (shouldShowSyncButton()) {
+    try {
+      var r0 = await fetch('customers.json?t=' + Date.now());
+      if (r0.ok) { customersData = await r0.json() || { records: [] }; return; }
+    } catch (e0) { console.warn('离线模式读取本地 customers.json 失败', e0); }
+    customersData = { records: [] };
+    return;
+  }
   // 优先走阿里云函数计算：与提交同源，无 CDN 缓存延迟，新增客户即时可见
   try {
     var res = await fcReq(WORKER_URL + '/customers');
@@ -1195,65 +1213,14 @@ function mergeCustomers() {
   cat._customerRecords = records;
 }
 
-/* ===== 同步线上客户档案到本地 ===== */
-/* 桌面端专用：先做冲突比对，无删除/覆盖则静默整写；有冲突则弹框让用户选「全部同步」或「仅合并新增」 */
-async function syncViaDesktopWithConfirm() {
-  var diff = await window.parent.api.syncCustomersDiff();
-  if (!diff || !diff.ok) throw new Error((diff && diff.error) || '同步比对失败');
-  var count = diff.online.records.length;
-  if (!diff.hasConflict) {
-    // 无删除/覆盖，直接整份落盘（新增信息默认更新本地）
-    var r = await window.parent.api.syncCustomersApply('full');
-    if (!r || !r.ok) throw new Error((r && r.error) || '写入本地失败');
-    return { ok: true, count: count, savedToLocal: true };
-  }
-  // 有冲突：弹确认框，返回 'full'（全部同步）或 'additions'（仅合并新增）
-  var mode = await showSyncConflictDialog(diff);
-  var r2 = await window.parent.api.syncCustomersApply(mode);
-  if (!r2 || !r2.ok) throw new Error((r2 && r2.error) || '写入本地失败');
-  return { ok: true, count: count, savedToLocal: true, mode: mode };
-}
+// syncViaDesktopWithConfirm（Electron 桌面端专用）已随 Electron 桌面端删除而移除
 
-/* 展示同步冲突确认弹窗，返回 Promise 解析为 'full' 或 'additions' */
-function showSyncConflictDialog(diff) {
-  return new Promise(function (resolve) {
-    var ov = document.getElementById('syncConflictOverlay');
-    var body = document.getElementById('syncConflictBody');
-    var add = diff.additions, del = diff.deletions.length, ovr = diff.overwrites.length;
-    var esc = function (s) {
-      return String(s).replace(/[&<>"]/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-      });
-    };
-    var html = '线上较本地：新增 <b style="color:#16a34a">' + add + '</b> 条、' +
-      '删除 <b style="color:#ef4444">' + del + '</b> 条、覆盖 <b style="color:#f59e0b">' + ovr + '</b> 条。';
-    if (del > 0) {
-      html += '<div style="margin-top:8px"><b style="color:#ef4444">将被删除：</b>' +
-        '<div style="max-height:90px;overflow:auto;font-size:12px;color:var(--text-secondary);padding-left:4px">' +
-        diff.deletions.map(function (d) { return '· ' + esc(d.name); }).join('<br>') + '</div></div>';
-    }
-    if (ovr > 0) {
-      html += '<div style="margin-top:8px"><b style="color:#f59e0b">将被覆盖：</b>' +
-        '<div style="max-height:90px;overflow:auto;font-size:12px;color:var(--text-secondary);padding-left:4px">' +
-        diff.overwrites.map(function (d) { return '· ' + esc(d.name); }).join('<br>') + '</div></div>';
-    }
-    html += '<div style="margin-top:10px">请选择处理方式：</div>';
-    body.innerHTML = html;
-
-    var btnFull = document.getElementById('syncFullBtn');
-    var btnAdd = document.getElementById('syncAddBtn');
-    btnFull.onclick = function () { ov.classList.remove('show'); resolve('full'); };
-    btnAdd.onclick = function () { ov.classList.remove('show'); resolve('additions'); };
-    ov.classList.add('show');
-  });
-}
+// showSyncConflictDialog（Electron 桌面端专用）已随 Electron 桌面端删除而移除
 
 /* 2026-08-10 新增：顶栏「🔄 同步线上内容」按钮调用。
-   智能适配两种环境：
-   ① 桌面端（pom-knowledge-app Electron）：通过 window.parent.api.syncCustomers*() 走主进程 IPC，
-      先冲突比对，无删除/覆盖直接整写；有冲突弹框二次确认后写入 app/kb/customers.json。
-   ② 浏览器站（部署到 GitHub 或 启动知识库.bat 本地服务）：直接 fetch 阿里云FC+jsDelivr，
-      若本地服务在跑则 POST /api/sync-write 写回 dist/customers.json，否则仅刷新显示。 */
+   浏览器站（启动知识库.bat 本地服务 / GitHub Pages）：直接 fetch 阿里云FC+jsDelivr 拉取最新客户档案，
+   若本地服务在跑则 POST /api/sync-write 写回 dist/customers.json，否则仅刷新显示。
+   （原 ① 桌面端 Electron IPC 路径已随 Electron 桌面端 2026-08-31 删除而移除。） */
 async function syncOnlineCustomers() {
   var btn = document.getElementById('syncOnlineBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 同步中...'; }
@@ -1261,16 +1228,7 @@ async function syncOnlineCustomers() {
   try {
     var res = null;
 
-    // 路径 A：桌面端 Electron IPC（冲突比对 + 二次确认，主进程 fetch + 写本地文件，绕过 CSP）
-    try {
-      if (window.parent && window.parent.api) {
-        if (typeof window.parent.api.syncCustomersDiff === 'function') {
-          res = await syncViaDesktopWithConfirm();
-        } else if (typeof window.parent.api.syncCustomers === 'function') {
-          res = await window.parent.api.syncCustomers(); // 兼容旧版桌面端（无确认）
-        }
-      }
-    } catch (e) { console.warn('Electron IPC 同步失败，回退 HTTP', e); }
+    // 桌面端 Electron IPC 路径已随 Electron 桌面端（2026-08-31 删除）移除；以下走浏览器站路径 B
 
     // 路径 B：浏览器站（直接 fetch 线上 + 可选 POST /api/sync-write）
     if (!res) {
@@ -1328,6 +1286,11 @@ async function syncOnlineCustomers() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔄 同步线上内容'; }
   }
+}
+
+function offlineSubmitNotice() {
+  // 线下模式提交客户表单仍写线上 FC，提示需同步后本地可见，避免"外传假象"
+  if (shouldShowSyncButton()) showToast('已提交到线上，点"同步线上内容"拉回本地查看');
 }
 
 function generateCustomerMd(rec) {
@@ -1527,7 +1490,7 @@ function renderSidebar(filter) {
         if (isLT && typeof LEARNING_TOOLS !== 'undefined') {
           for (var li = 0; li < LEARNING_TOOLS.length; li++) {
             var lt = LEARNING_TOOLS[li];
-            html += '<div class="file-item sub-file" onclick="window.open(\'' + lt.url + '\',\'_blank\')"><span class="dot" style="background:#f59e0b"></span><span>' + lt.icon + ' ' + lt.name + '</span><span class="ext-badge link">↗</span></div>';
+            html += '<div class="file-item sub-file" onclick="openExt(\'' + lt.url + '\')"><span class="dot" style="background:#f59e0b"></span><span>' + lt.icon + ' ' + lt.name + '</span><span class="ext-badge link">↗</span></div>';
           }
         }
         html += '</div></div>';
@@ -1536,7 +1499,7 @@ function renderSidebar(filter) {
     html += '</div></div>';
   }
     /* 客户分布区域图：独立页（与知识库主内容隔离），作为主分类显示，无需密码 */
-    html += '<div class="cat-group"><div class="cat-header open" style="cursor:pointer" onclick="window.open(\'https://yikezhong1.github.io/pom-knowledge-base/customer-map/\',\'_blank\')"><span class="icon">🗺️</span><span>客户分布区域图</span><span class="ext-badge link">↗</span><span class="arrow">&#9654;</span></div></div>';
+    html += '<div class="cat-group"><div class="cat-header open" style="cursor:pointer" onclick="window.open(\'./customer-map/\',\'_blank\')"><span class="icon">🗺️</span><span>客户分布区域图</span><span class="ext-badge link">↗</span><span class="arrow">&#9654;</span></div></div>';
   el.innerHTML = html;
 }
 
@@ -2074,6 +2037,7 @@ async function submitCustomerForm() {
     mergeCustomers();
     renderSidebar();
     showToast('提交成功！客户「' + record.customerName + '」已保存');
+    offlineSubmitNotice();
     /* 显示客户表格 */
     setTimeout(function() { showCustomerTable(); }, 800);
   } catch (e) {
@@ -2469,6 +2433,7 @@ async function executeDeleteCustomer() {
     renderSidebar();
     closeDeleteModal();
     showToast('已删除客户「' + (rec.customerName || '') + '」（原始数据已保留备份）');
+    offlineSubmitNotice();
     showCustomerTable();
   } catch (e) {
     showToast('删除失败：' + e.message);
@@ -2617,6 +2582,7 @@ async function saveCustomerEdit() {
     mergeCustomers();
     renderSidebar();
     showToast('客户「' + (rec.customerName || '') + '」信息已更新');
+    offlineSubmitNotice();
     setTimeout(function() { showCustomerTable(); }, 800);
   } catch (e) {
     showToast('保存失败：' + e.message);
@@ -3024,6 +2990,7 @@ function trackVisit() {
 }
 
 function saveVisit(visit) {
+  if (shouldShowSyncButton()) return; // 离线模式不静默上报访问统计到线上 FC
   fcReq(WORKER_URL + '/stats', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3036,7 +3003,10 @@ function saveVisit(visit) {
    失败原因：响应 Content-Type 为 text/html;charset=GBK 非 JS 类型、script.charset 属性已废弃、
    隐私插件普遍拦截第三方脚本。功能价值极低且涉及访客隐私，按教授指示整体移除。 */
 
-function openStats() { document.getElementById('statsOverlay').classList.add('show'); loadStats(); }
+function openStats() {
+  if (shouldShowSyncButton()) { showToast('离线模式暂不支持行情统计，请联网或点同步查看'); return; }
+  document.getElementById('statsOverlay').classList.add('show'); loadStats();
+}
 function closeStats() { document.getElementById('statsOverlay').classList.remove('show'); }
 
 /* verifyStatsPw 已移除：统计面板不再设密码，openStats 直接 loadStats() */
@@ -3044,6 +3014,12 @@ function closeStats() { document.getElementById('statsOverlay').classList.remove
 var currentStatsDays = 7;
 var currentStatsResults = [];
 function loadStats(days, realtime) {
+  if (shouldShowSyncButton()) {
+    var rt0 = document.getElementById('realtimeBtn'); if (rt0) rt0.disabled = true;
+    document.querySelectorAll('.range-btn').forEach(function(b){ b.disabled = true; });
+    showToast('离线模式暂不支持行情统计，请联网或点同步查看');
+    return;
+  }
   days = days || currentStatsDays || 7;
   currentStatsDays = days;
   document.querySelectorAll('.range-btn').forEach(function(b){ b.classList.toggle('active', +b.dataset.days === days); });
@@ -3239,14 +3215,14 @@ function exportStatsCSV() {
 
 /* 统计入口：?stats打开面板，否则静默采集 */
 setTimeout(trackVisit, 2000);
-if (location.search.indexOf('stats') >= 0) { openStats(); }
+if (!shouldShowSyncButton() && location.search.indexOf('stats') >= 0) { openStats(); }
 
 /* ===== Service Worker 缓存 ===== */
 /* SW 自愈（2026-08-24 紧急修复）：若浏览器已注册的 SW 版本与当前页面内置版本不一致，
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202609012240';
+  var KB_SW_VERSION = 'pom-kb-202609021530';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
