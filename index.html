@@ -3222,7 +3222,7 @@ if (!shouldShowSyncButton() && location.search.indexOf('stats') >= 0) { openStat
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202609021606';
+  var KB_SW_VERSION = 'pom-kb-202609031406';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
