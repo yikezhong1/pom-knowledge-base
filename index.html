@@ -694,8 +694,8 @@ function buildSearchIndex(appendOnly) {
 
 /* ===== API 中间层（持有 GitHub Token，前端不再暴露令牌） ===== */
 var WORKER_URL = 'https://pom-kb-api-fqaubmeajz.cn-hangzhou.fcapp.run/api';  /* 阿里云 FC HTTP 触发器地址（替代原 Vercel Worker，国内可达） */
-var READ_TOKEN = '{{KB_READ_TOKEN}}';   /* 只读令牌：GET /customers /stats /geocode 鉴权，构建时注入（只读权限，随公网发布可接受） */
-var STATS_TOKEN = '{{KB_STATS_TOKEN}}'; /* 埋点写令牌：POST /stats 鉴权，构建时注入 */
+var READ_TOKEN = '93b2418fdfbc9b8e10f5e47a7491350ddc46396dca1ba40608ba5aca5cbb3a61';   /* 只读令牌：GET /customers /stats /geocode 鉴权，构建时注入（只读权限，随公网发布可接受） */
+var STATS_TOKEN = 'e591bf8747827d412b99c1fc52c78b326aa9ca655bd45e20b43e5cb315e5a84c'; /* 埋点写令牌：POST /stats 鉴权，构建时注入 */
 /* WRITE_KEY（客户写口令）不注入前端：教授每次提交时手输，会话级不持久化，杜绝公网泄露 */
 function fcReq(url, init, token) {  /* token 缺省用 READ_TOKEN（只读 GET）；写操作显式传入 STATS_TOKEN / WRITE_KEY */
   init = init || {};
@@ -3222,7 +3222,7 @@ if (!shouldShowSyncButton() && location.search.indexOf('stats') >= 0) { openStat
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202609031406';
+  var KB_SW_VERSION = 'pom-kb-202609041032';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
