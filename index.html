@@ -3147,8 +3147,13 @@ function loadStats(days, realtime) {
 }
 
 /* 直接读 GitHub 上的 stats/*.json（经 jsDelivr CDN 加速，国内可达），前端按天聚合 */
-function fetchStatsFromGitHub(days) {
-  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/stats/';
+async function fetchStatsFromGitHub(days) {
+  /* 2026-09-07 版本化：jsDelivr 无版本 URL 有最长约12h缓存，而 FC 每天多次追加同一天
+     stats 文件（每次写入=主仓新 commit），缓存窗口内会拿到旧版统计。
+     改用 @commit-sha 不可变版本 URL（sha 解析复用 getLatestCommit，页面级缓存不增请求）；
+     sha 拿不到时退回无版本 URL，行为与旧版一致。 */
+  var sha = await getLatestCommit();
+  var CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base' + (sha ? '@' + sha : '') + '/stats/';
   var now = new Date();
   var tasks = [];
   for (var i = days - 1; i >= 0; i--) {
@@ -3306,7 +3311,7 @@ if (!shouldShowSyncButton() && location.search.indexOf('stats') >= 0) { openStat
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202609070122';
+  var KB_SW_VERSION = 'pom-kb-202609070145';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
