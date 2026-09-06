@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pom-kb-202609062222';
+var CACHE_NAME = 'pom-kb-202609070122';
 /* 2026-08-24 升 v4：v3 缓存了 Bug A 修复前的旧 index.html，导致教授"看不到"23日日报。
    升版本号让旧 SW 激活时清掉 v3 缓存，强制重新拉取含 Bug A 修复的新 index.html。 */
 /* 预缓存骨架：导航页 + JS 库。数据文件(data-index.json / cat-*.json)走运行时懒加载缓存 */
@@ -36,15 +36,25 @@ function staleWhileRevalidate(request) {
 /* 数据文件(目录索引/分类json)：联网优先，断网才回退缓存。
    绝不能 staleWhileRevalidate —— 否则会先把"部署前的旧数据"喂给页面，
    造成"首屏能看到新内容、刷新后旧内容"的诡异现象。 */
+/* 2026-09-07 数据文件缓存键规范化：去掉 ?query 与 /@commit 段。
+   前端数据 URL 现带 @commit-sha / ?t=（每次部署都变），
+   若按完整 URL 作缓存键，断网回退必 miss。规范化后永远命中最近一次成功缓存。 */
+function stableKey(url) {
+  var u = url.split('?')[0];
+  u = u.replace(/\/@[0-9a-fA-F]{6,40}\//, '/');
+  return u;
+}
+
 function networkFirst(request) {
+  var key = stableKey(request.url);
   return fetch(request).then(function(response) {
     if (response && response.status === 200) {
       var clone = response.clone();
-      caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+      caches.open(CACHE_NAME).then(function(cache) { cache.put(key, clone); });
     }
     return response;
   }).catch(function() {
-    return caches.match(request);
+    return caches.match(key);
   });
 }
 
