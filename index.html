@@ -1086,12 +1086,62 @@ window.addEventListener('hashchange', function() {
    国内网络下常超时(pending而非报错)，页面永远"加载中"或输密码无反应。
    改为「jsDelivr 国内可达源优先 + 同域兜底 + 超时保护」。 */
 var KB_CDN = 'https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base/';
+/* 2026-09-07 版本化根治「部署后看不到更新」：
+   jsDelivr 对 gh/ 无版本 URL 忽略 query 参数（?t= 无效），purge 接口也不可依赖——
+   唯一可靠的是 @commit-sha 不可变版本缓存（实测必回源最新数据）。
+   版本号由前端运行时向 GitHub API 实时解析主仓最新 commit（公开接口、CORS 放行、匿名可用）：
+   部署产生新 commit → sha 变 → 全新 URL 无缓存可用 → 必拿最新。 */
+var KB_COMMIT = '';
+var KB_COMMIT_FAIL = false; /* 页面级退避：API 429/403 或持续失败时，本次页面生命周期不再请求 */
+var KB_COMMIT_PEND = null;  /* in-flight 去重：并发 fetchKB 只发一次 API */
+function getLatestCommit() {
+  if (KB_COMMIT || KB_COMMIT_FAIL) return Promise.resolve(KB_COMMIT);
+  try {
+    var cached = JSON.parse(sessionStorage.getItem('kb_commit') || 'null');
+    if (cached && cached.sha && (Date.now() - cached.t) < 600000) {
+      KB_COMMIT = cached.sha;
+      return Promise.resolve(KB_COMMIT);
+    }
+  } catch (e) {}
+  if (KB_COMMIT_PEND) return KB_COMMIT_PEND;
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () { ctrl.abort(); }, 3000);
+  KB_COMMIT_PEND = fetch('https://api.github.com/repos/yikezhong1/pom-knowledge-base/commits/main', { signal: ctrl.signal, headers: { 'Accept': 'application/vnd.github+json' } })
+    .then(function (r) {
+      clearTimeout(timer);
+      if (!r.ok) { if (r.status === 429 || r.status === 403) KB_COMMIT_FAIL = true; return null; }
+      return r.json();
+    })
+    .then(function (j) {
+      if (j && j.sha) {
+        KB_COMMIT = j.sha;
+        try { sessionStorage.setItem('kb_commit', JSON.stringify({ sha: j.sha, t: Date.now() })); } catch (e) {}
+      } else {
+        KB_COMMIT_FAIL = true; /* 未拿到 sha：页面级退避，走同域层 */
+      }
+      return KB_COMMIT;
+    })
+    .catch(function () { clearTimeout(timer); KB_COMMIT_FAIL = true; return ''; });
+  return KB_COMMIT_PEND;
+}
 async function fetchKB(name, timeout) {
   timeout = timeout || 8000;
   // 线下模式（localhost/127.0.0.1/file）：只读本地，不回退 jsDelivr 线上源
   var offline = shouldShowSyncButton();
-  /* 2026-09-06 A改：jsDelivr 国内优先 + 同域兜底（原同域优先在国内常卡 github.io 满 8s 超时，门禁验证/首屏都被拖死） */
-  var sources = offline ? [name] : [KB_CDN + name, name];
+  /* 2026-09-07 定案三层源：
+     ① jsDelivr@commit-sha（版本化必新，国内快）
+     ② 同域原样 name（GitHub Pages 随主仓自动更新；name 可能自带 ?t=，此处严禁再拼 ?t=，避免 ?x?t=y 坏 URL）
+     ③ jsDelivr 无版本兜底（可能旧，好过失败） */
+  var sources;
+  if (offline) {
+    sources = [name];
+  } else {
+    var sha = await getLatestCommit();
+    sources = [];
+    if (sha) sources.push('https://cdn.jsdelivr.net/gh/yikezhong1/pom-knowledge-base@' + sha + '/' + name);
+    sources.push(name);
+    sources.push(KB_CDN + name);
+  }
   var lastErr;
   for (var i = 0; i < sources.length; i++) {
     var ctrl = new AbortController();
@@ -3256,7 +3306,7 @@ if (!shouldShowSyncButton() && location.search.indexOf('stats') >= 0) { openStat
    说明老 SW 还在控制页面、缓存了旧 index.html，会导致首屏永久"加载中"。
    主动注销旧 SW 并重载，确保新版本 SW + 新 index.html 生效。版本号由构建注入，与 sw.js CACHE_NAME 同步。 */
 if ('serviceWorker' in navigator) {
-  var KB_SW_VERSION = 'pom-kb-202609062222';
+  var KB_SW_VERSION = 'pom-kb-202609070122';
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) {
       var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
